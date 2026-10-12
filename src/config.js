@@ -3,6 +3,7 @@ import 'dotenv/config';
 const required = ['DISCORD_BOT_TOKEN', 'DISCORD_CLIENT_ID'];
 
 function parseMarketItems(value) {
+  if (!value.trim()) return [];
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const items = value.split(',').map((part) => {
     const [id, ...nameParts] = part.trim().split('|');
@@ -26,6 +27,16 @@ export function getConfig() {
     throw new Error('POST_TIME must use HH:MM format, for example 09:00.');
   }
 
+  const sellTaxPercent = Number(process.env.SELL_TAX_PERCENT ?? 13);
+  if (!(sellTaxPercent >= 0 && sellTaxPercent < 100)) {
+    throw new Error('SELL_TAX_PERCENT must be a number from 0 to 99, for example 13.');
+  }
+
+  const topPerWorkshop = Number(process.env.TOP_PER_WORKSHOP ?? 1);
+  if (!(Number.isInteger(topPerWorkshop) && topPerWorkshop >= 1 && topPerWorkshop <= 10)) {
+    throw new Error('TOP_PER_WORKSHOP must be a whole number from 1 to 10.');
+  }
+
   return {
     botToken: process.env.DISCORD_BOT_TOKEN,
     clientId: process.env.DISCORD_CLIENT_ID,
@@ -42,5 +53,7 @@ export function getConfig() {
       : parseMarketItems(process.env.MARKET_ITEMS ?? ''),
     timeZone: process.env.TIME_ZONE ?? 'Asia/Bangkok',
     postTime,
+    sellTaxPercent,
+    topPerWorkshop,
   };
 }
