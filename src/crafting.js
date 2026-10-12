@@ -71,7 +71,7 @@ async function fetchPrices(config, recipes, intermediates) {
   const results = await mapLimit(unique, 4, async (ref) => {
     const item = ref.id ? { id: ref.id, name: ref.item } : await findItem(config, ref.item, ref.quality);
     const { price } = await fetchMarketPrice(config, item);
-    return { price, name: item.name };
+    return { price, name: item.name, icon: item.iconUrl };
   });
   const found = new Map();
   const errors = new Map();
@@ -117,6 +117,7 @@ export async function getCraftRecommendations(config) {
     crafts.push({
       workshop: recipe.workshop,
       item: found.get(refKey(recipe))?.name ?? recipe.item,
+      icon: found.get(refKey(recipe))?.icon,
       tier: recipe.quality,
       quantity,
       sale: Math.floor(output.price * quantity * keep),

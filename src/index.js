@@ -1,7 +1,7 @@
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { getConfig } from './config.js';
 import { getCraftRecommendations } from './crafting.js';
-import { fetchMarketPrice, makeDemoWorkshopEmbed, makeMarketEmbed, makeWorkshopEmbed } from './deltaforce.js';
+import { attachThumbnails, fetchMarketPrice, makeDemoWorkshopMessages, makeMarketEmbed, makeWorkshopMessages } from './deltaforce.js';
 import { getAllChannels, getChannel, setChannel } from './store.js';
 
 const config = getConfig();
@@ -10,25 +10,21 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 async function postToChannel(channelId) {
   const channel = await client.channels.fetch(channelId);
   if (!channel?.isTextBased()) throw new Error('Configured channel is unavailable or is not a text channel.');
-  if (config.demoMode) {
-    await channel.send({ embeds: [makeDemoWorkshopEmbed()] });
-    return;
-  }
-  const embeds = [await makeCraftEmbed()];
-  if (config.marketItems.length) {
+  const messages = config.demoMode ? makeDemoWorkshopMessages() : await makeCraftMessages();
+  if (!config.demoMode && config.marketItems.length) {
     const results = await Promise.allSettled(config.marketItems.map((item) => fetchMarketPrice(config, item)));
     const prices = results.filter(({ status }) => status === 'fulfilled').map(({ value }) => value);
-    if (prices.length) embeds.push(makeMarketEmbed(prices));
+    if (prices.length) messages.push({ embeds: [makeMarketEmbed(prices)] });
   }
-  await channel.send({ embeds });
+  for (const message of messages) await channel.send(await attachThumbnails(message));
 }
 
-async function makeCraftEmbed() {
+async function makeCraftMessages() {
   const { groups, skipped } = await getCraftRecommendations(config);
   for (const { recipe, reasons } of skipped) console.warn(`Skipped recipe ${recipe.item}: ${reasons.join('; ')}`);
   if (!groups.length) throw new Error('Could not price any recipe in data/recipes.json.');
   const notes = skipped.length ? [`⚠️ ข้าม ${skipped.length} สูตรเพราะดึงราคาไม่ได้`] : [];
-  return makeWorkshopEmbed(groups, { footer: 'ราคาจาก deltaforceapi.com', notes });
+  return makeWorkshopMessages(groups, { footer: 'ราคาจาก deltaforceapi.com', notes, top: config.topPerWorkshop });
 }
 
 async function postToAllConfiguredChannels() {

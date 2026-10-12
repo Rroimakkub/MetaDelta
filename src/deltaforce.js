@@ -108,45 +108,82 @@ function formatDuration(minutes) {
   return minutes % 60 ? `${hours} ชม. ${minutes % 60} นาที` : `${hours} ชม.`;
 }
 
-function formatCraftLine(craft, rank) {
+const RANK_COLORS = [0xf1c40f, 0xbdc3c7, 0xcd7f32];
+
+function makeCraftEmbed(craft, rank, showRank) {
   const { profit, profitPerHour, roi } = calculateCraft(craft);
-  const amount = craft.quantity > 1 ? ` ×${formatPrice(craft.quantity)}` : '';
-  return [
-    `**${rank}. ${craft.item}**${craft.tier ? ` T${craft.tier}` : ''}${amount}  •  ${formatDuration(craft.minutes)}`,
-    `└ 🟢 **\`${formatPrice(profitPerHour)}\` / ชม.**  •  กำไร \`${formatPrice(profit)}\`  •  ต้นทุน \`${formatPrice(craft.materials)}\`${roi == null ? '' : `  •  ROI ${roi}%`}`,
-  ].join('\n');
+  const amount = craft.quantity > 1 ? `  •  ×${formatPrice(craft.quantity)}` : '';
+  const embed = new EmbedBuilder()
+    .setColor(RANK_COLORS[rank - 1] ?? 0x18a558)
+    .setTitle(`${showRank ? `${rank}. ` : ''}${craft.item}${craft.tier ? ` T${craft.tier}` : ''}`)
+    .setDescription([
+      `🟢 **\`${formatPrice(profitPerHour)}\` / ชม.**  •  ${formatDuration(craft.minutes)}${amount}`,
+      `กำไร \`${formatPrice(profit)}\` / รอบ${roi == null ? '' : `  •  ROI ${roi}%`}`,
+      `ขายได้ \`${formatPrice(craft.sale)}\`  •  ต้นทุน \`${formatPrice(craft.materials)}\``,
+    ].join('\n'));
+  if (craft.icon) embed.setThumbnail(craft.icon);
+  return embed;
 }
 
-export function makeWorkshopEmbed(groups, { footer, notes = [], top = 5 }) {
-  const fields = groups.map(({ workshop, crafts }) => {
-    const profitable = crafts.filter((craft) => calculateCraft(craft).profitPerHour > 0).slice(0, top);
-    const lines = profitable.map((craft, index) => formatCraftLine(craft, index + 1));
-    while (lines.join('\n').length > 1_024) lines.pop();
-    return {
-      name: `🏭 ${workshop}`,
-      value: lines.length ? lines.join('\n') : '🔴 ไม่มีสูตรที่ได้กำไรตอนนี้',
-      inline: false,
-    };
+// One embed per craft so each item can show its icon. The first embed of each workshop carries its name.
+// Workshops are packed into as few messages as possible; Discord allows at most 10 embeds per message.
+export function makeWorkshopMessages(groups, { footer, notes = [], top = 1 }) {
+  const limit = Math.min(top, 10);
+  const intro = [
+    '**Black Site Workshop — คำแนะนำการคราฟ**',
+    `${limit === 1 ? 'คราฟต์ที่แนะนำที่สุด' : `${limit} อันดับคราฟต์ที่กำไรต่อชั่วโมงสูงสุด`}ในแต่ละแผนก  •  \`กำไร = ราคาขายหลังหักภาษี − ต้นทุนวัตถุดิบ\``,
+    ...notes,
+  ].join('\n');
+
+  const workshopEmbeds = groups.map(({ workshop, crafts }) => {
+    const profitable = crafts.filter((craft) => calculateCraft(craft).profitPerHour > 0).slice(0, limit);
+    const embeds = profitable.length
+      ? profitable.map((craft, rank) => makeCraftEmbed(craft, rank + 1, limit > 1))
+      : [new EmbedBuilder().setColor(0xe74c3c).setDescription('🔴 ไม่มีสูตรที่ได้กำไรตอนนี้')];
+    embeds[0].setAuthor({ name: `🏭 ${workshop}` });
+    return embeds;
   });
 
-  const description = [`${top} อันดับคราฟต์ที่กำไรต่อชั่วโมงสูงสุดในแต่ละแผนก`, '`กำไร = ราคาขายหลังหักภาษี − ต้นทุนวัตถุดิบ`', ...notes];
-  return new EmbedBuilder()
-    .setColor(0x18a558)
-    .setTitle('Black Site Workshop — คำแนะนำการคราฟ')
-    .setDescription(description.join('\n').slice(0, 4_000))
-    .addFields(fields.slice(0, 25))
-    .setFooter({ text: footer })
-    .setTimestamp();
+  const messages = [];
+  for (const embeds of workshopEmbeds) {
+    const last = messages.at(-1);
+    if (last && last.embeds.length + embeds.length <= 10) last.embeds.push(...embeds);
+    else messages.push({ embeds: [...embeds] });
+  }
+  for (const message of messages) message.embeds.at(-1).setFooter({ text: footer }).setTimestamp();
+  if (messages.length) messages[0].content = intro;
+  return messages;
 }
 
-export function makeDemoWorkshopEmbed() {
+// Discord's image proxy cannot fetch from the DeltaForceAPI CDN, so download each thumbnail here
+// and upload it with the message. Thumbnails that fail to download are dropped.
+export async function attachThumbnails(message) {
+  const files = [];
+  for (const embed of message.embeds) {
+    const url = embed.data.thumbnail?.url;
+    if (!url?.startsWith('http')) continue;
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const name = `icon-${files.length + 1}.png`;
+      files.push({ attachment: Buffer.from(await response.arrayBuffer()), name });
+      embed.setThumbnail(`attachment://${name}`);
+    } catch (error) {
+      console.warn(`Could not download item icon ${url}: ${error.message}`);
+      embed.setThumbnail(null);
+    }
+  }
+  return files.length ? { ...message, files } : message;
+}
+
+export function makeDemoWorkshopMessages() {
   const demo = [
     { workshop: 'Cyber Warfare Division', item: 'Phantom Vertical Foregrip', sale: 18_200, materials: 13_650, minutes: 60 },
     { workshop: 'Workbench', item: '4.6×30mm AP SX', sale: 96_400, materials: 49_384, minutes: 60 },
     { workshop: 'Pharmacy', item: 'Precision Helmet Repair Kit', sale: 21_800, materials: 12_731, minutes: 60 },
     { workshop: 'Armor Bench', item: 'Elite Vest', sale: 68_700, materials: 42_756, minutes: 60 },
   ];
-  return makeWorkshopEmbed(
+  return makeWorkshopMessages(
     demo.map((craft) => ({ workshop: craft.workshop, crafts: [{ quantity: 1, ...craft }] })),
     { footer: 'ข้อมูลตัวอย่างสำหรับทดสอบ' },
   );
