@@ -1,6 +1,7 @@
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { getConfig } from './config.js';
-import { fetchMarketPrice, makeDemoWorkshopEmbed, makeMarketEmbed } from './deltaforce.js';
+import { getCraftRecommendations } from './crafting.js';
+import { fetchMarketPrice, makeDemoWorkshopEmbed, makeMarketEmbed, makeWorkshopEmbed } from './deltaforce.js';
 import { getAllChannels, getChannel, setChannel } from './store.js';
 
 const config = getConfig();
@@ -13,10 +14,21 @@ async function postToChannel(channelId) {
     await channel.send({ embeds: [makeDemoWorkshopEmbed()] });
     return;
   }
-  const results = await Promise.allSettled(config.marketItems.map((item) => fetchMarketPrice(config, item)));
-  const prices = results.filter(({ status }) => status === 'fulfilled').map(({ value }) => value);
-  if (!prices.length) throw new Error('Could not retrieve a price for any configured item.');
-  await channel.send({ embeds: [makeMarketEmbed(prices)] });
+  const embeds = [await makeCraftEmbed()];
+  if (config.marketItems.length) {
+    const results = await Promise.allSettled(config.marketItems.map((item) => fetchMarketPrice(config, item)));
+    const prices = results.filter(({ status }) => status === 'fulfilled').map(({ value }) => value);
+    if (prices.length) embeds.push(makeMarketEmbed(prices));
+  }
+  await channel.send({ embeds });
+}
+
+async function makeCraftEmbed() {
+  const { groups, skipped } = await getCraftRecommendations(config);
+  for (const { recipe, reasons } of skipped) console.warn(`Skipped recipe ${recipe.item}: ${reasons.join('; ')}`);
+  if (!groups.length) throw new Error('Could not price any recipe in data/recipes.json.');
+  const notes = skipped.length ? [`⚠️ ข้าม ${skipped.length} สูตรเพราะดึงราคาไม่ได้`] : [];
+  return makeWorkshopEmbed(groups, { footer: 'ราคาจาก deltaforceapi.com', notes });
 }
 
 async function postToAllConfiguredChannels() {

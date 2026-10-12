@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "check-crafts": "node src/check-crafts.js",
+    "create-key": "node src/create-api-key.js",
     "find-items": "node src/find-items.js",
     "register": "node src/register-commands.js",
     "start": "node src/index.js"

@@ -1,0 +1,1547 @@
+{
+  "source": "DF - Black Site Crafting Costs S11.xlsx",
+  "intermediates": [
+    {
+      "item": "Int Ammo Prod",
+      "quantity": 4,
+      "materials": [
+        {
+          "item": "E-Type Canister",
+          "quantity": 1
+        },
+        {
+          "item": "Hammer Drill",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "item": "Titanium Alloy",
+      "quantity": 4,
+      "materials": [
+        {
+          "item": "Programmable Processor",
+          "quantity": 1
+        },
+        {
+          "item": "Orange Energy Gel",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "item": "Premium Fuel",
+      "quantity": 4,
+      "materials": [
+        {
+          "item": "Cutlass",
+          "quantity": 1
+        },
+        {
+          "item": "Boxed Drip Coffee",
+          "quantity": 1
+        }
+      ]
+    }
+  ],
+  "recipes": [
+    {
+      "workshop": "Workbench",
+      "item": "12.7x55mm",
+      "quality": 5,
+      "quantity": 90,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Premium Fuel",
+          "quantity": 4
+        },
+        {
+          "item": "High-precision Digital Caliper",
+          "quantity": 2
+        },
+        {
+          "item": "Basic Fuel",
+          "quantity": 5
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "4.6x30mm AP SX",
+      "quality": 5,
+      "quantity": 150,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Premium Fuel",
+          "quantity": 2
+        },
+        {
+          "item": "High-precision Digital Caliper",
+          "quantity": 1
+        },
+        {
+          "item": "Basic Fuel",
+          "quantity": 2
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "5.45x39mm BS",
+      "quality": 5,
+      "quantity": 120,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Premium Fuel",
+          "quantity": 2
+        },
+        {
+          "item": "Electric Demolition Hammer",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "5.56x45mm M995",
+      "quality": 5,
+      "quantity": 120,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Premium Fuel",
+          "quantity": 2
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 2
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "5.7x28mm",
+      "quality": 5,
+      "quantity": 120,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Premium Fuel",
+          "quantity": 2
+        },
+        {
+          "item": "Gunpowder",
+          "quantity": 2
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "5.8x42mm DVC12",
+      "quality": 5,
+      "quantity": 120,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Premium Fuel",
+          "quantity": 2
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 2
+        },
+        {
+          "item": "Gunpowder",
+          "quantity": 1
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "6.8x51mm Hybrid",
+      "quality": 5,
+      "quantity": 120,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Premium Fuel",
+          "quantity": 2
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Gunpowder",
+          "quantity": 3
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "7.62x39mm AP",
+      "quality": 5,
+      "quantity": 120,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Premium Fuel",
+          "quantity": 2
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 2
+        },
+        {
+          "item": "Basic Fuel",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "7.62x51mm M62",
+      "quality": 5,
+      "quantity": 120,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Premium Fuel",
+          "quantity": 3
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 1
+        },
+        {
+          "item": "Gunpowder",
+          "quantity": 1
+        },
+        {
+          "item": "Basic Fuel",
+          "quantity": 3
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "7.62x54R BT",
+      "quality": 5,
+      "quantity": 120,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Premium Fuel",
+          "quantity": 3
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Basic Fuel",
+          "quantity": 4
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "9x39mm",
+      "quality": 5,
+      "quantity": 120,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Premium Fuel",
+          "quantity": 2
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 1
+        },
+        {
+          "item": "Basic Fuel",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": ".45 ACP Super",
+      "quality": 5,
+      "quantity": 120,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Premium Fuel",
+          "quantity": 2
+        },
+        {
+          "item": "Gunpowder",
+          "quantity": 2
+        },
+        {
+          "item": "Audio Player",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": ".357 Magnum",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 1
+        },
+        {
+          "item": "Memory Card",
+          "quantity": 2
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": ".45 ACP AP",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Basic Fuel",
+          "quantity": 1
+        },
+        {
+          "item": ".45 Green",
+          "quantity": 20,
+          "price": 111
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": ".50 AE",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 1
+        },
+        {
+          "item": "Electric Demolition Hammer",
+          "quantity": 2
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 3
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "12 Gauge Slug AP-20",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 1
+        },
+        {
+          "item": "12 Gauge Green",
+          "quantity": 30,
+          "price": 52
+        },
+        {
+          "item": "Electric Demolition Hammer",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "12 Gauge Dragon's Breath",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "12.7x55mm PS12",
+      "quality": 4,
+      "quantity": 120,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 4
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 1
+        },
+        {
+          "item": "Audio Player",
+          "quantity": 1
+        },
+        {
+          "item": "Electric Demolition Hammer",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "12.7x55mm PD12",
+      "quality": 4,
+      "quantity": 120,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Gunpowder",
+          "quantity": 3
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "4.6x30mm FMJ SX",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 2
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "5.45x39mm BT",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 2
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "5.56x45mm M855A1",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 2
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 1
+        },
+        {
+          "item": "Power",
+          "quantity": 1
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "5.7x28mm SS193",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 2
+        },
+        {
+          "item": "Gunpowder",
+          "quantity": 1
+        },
+        {
+          "item": "5.7x28 Green",
+          "quantity": 60,
+          "price": 97
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "5.8x42mm DBP10",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 2
+        },
+        {
+          "item": "Basic Fuel",
+          "quantity": 2
+        },
+        {
+          "item": "5.8x42 Green",
+          "quantity": 150,
+          "price": 84
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "6.8x51mm FMJ",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Basic Fuel",
+          "quantity": 3
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 1
+        },
+        {
+          "item": "Electric Demolition Hammer",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "7.62x39mm BP",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Basic Fuel",
+          "quantity": 1
+        },
+        {
+          "item": "7.62x39 Green",
+          "quantity": 30,
+          "price": 101
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "7.62x51mm M80",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Gunpowder",
+          "quantity": 1
+        },
+        {
+          "item": "Basic Fuel",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "7.62x54R LPS",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Gunpowder",
+          "quantity": 1
+        },
+        {
+          "item": "Basic Fuel",
+          "quantity": 1
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "9x19mm PBP",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 2
+        },
+        {
+          "item": "Gunpowder",
+          "quantity": 1
+        },
+        {
+          "item": "9x19 Green",
+          "quantity": 30,
+          "price": 83
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 3
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "9x39mm SP6",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Basic Fuel",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": ".300 BLK",
+      "quality": 5,
+      "quantity": 120,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Premium Fuel",
+          "quantity": 2
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 1
+        },
+        {
+          "item": "Basic Fuel",
+          "quantity": 3
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": ".300 BLK",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 2
+        },
+        {
+          "item": "Cordless Portable Drill",
+          "quantity": 1
+        },
+        {
+          "item": "Basic Fuel",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "Carbon Fiber Armor-Piercing Arrow",
+      "quality": 5,
+      "quantity": 120,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Premium Fuel",
+          "quantity": 3
+        },
+        {
+          "item": "Spinning Handsaw",
+          "quantity": 1
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Cordless Portable Drill",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "Carbon Fiber Bone-Piercer Arrow",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "High-precision Digital Caliper",
+          "quantity": 3
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 2
+        },
+        {
+          "item": "Gunpowder",
+          "quantity": 3
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "45-70 Govt",
+      "quality": 5,
+      "quantity": 120,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Premium Fuel",
+          "quantity": 3
+        },
+        {
+          "item": "Spinning Handsaw",
+          "quantity": 1
+        },
+        {
+          "item": "Gunpowder",
+          "quantity": 2
+        },
+        {
+          "item": "Cordless Portable Drill",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "45-70 Govt",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Gunpowder",
+          "quantity": 1
+        },
+        {
+          "item": "Cordless Portable Drill",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "4.6x30mm AP ST",
+      "quality": 5,
+      "quantity": 150,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Premium Fuel",
+          "quantity": 1
+        },
+        {
+          "item": "Space Coolant",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "4.6x30mm FMJ ST",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 2
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "4.6x30mm CT",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 2
+        },
+        {
+          "item": "Electric Demolition Hammer",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Workbench",
+      "item": "12 Gauge DART",
+      "quality": 4,
+      "quantity": 180,
+      "minutes": 420,
+      "materials": [
+        {
+          "item": "Int Ammo Prod",
+          "quantity": 3
+        },
+        {
+          "item": "Basic Ammo Prod",
+          "quantity": 2
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "Assault Tactical Vest",
+      "quality": 4,
+      "quantity": 1,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Polymer Fabric",
+          "quantity": 1,
+          "price": 16369
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "Raider Tactical Vest",
+      "quality": 4,
+      "quantity": 1,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Polymer Fabric",
+          "quantity": 1,
+          "price": 16369
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "DRC Advanced Recon Chest Rig",
+      "quality": 4,
+      "quantity": 1,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Polymer Fabric",
+          "quantity": 1,
+          "price": 16369
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "GIR Field Chest Rig",
+      "quality": 4,
+      "quantity": 1,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Polymer Fabric",
+          "quantity": 1,
+          "price": 16369
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 3
+        },
+        {
+          "item": "Screwdriver",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "ALS Load System",
+      "quality": 5,
+      "quantity": 1,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Polyethylene Fiber",
+          "quantity": 1
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 1
+        },
+        {
+          "item": "Duct Tape",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "HLS-2 Heavy Backpack",
+      "quality": 5,
+      "quantity": 1,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Polyethylene Fiber",
+          "quantity": 1
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 1
+        },
+        {
+          "item": "Duct Tape",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "D3 Tactical Climbing Bag",
+      "quality": 5,
+      "quantity": 1,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Polyethylene Fiber",
+          "quantity": 1
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 1
+        },
+        {
+          "item": "Screwdriver",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "GT5 Field Backpack",
+      "quality": 5,
+      "quantity": 1,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Polyethylene Fiber",
+          "quantity": 1
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 2
+        },
+        {
+          "item": "Screwdriver",
+          "quantity": 2
+        },
+        {
+          "item": "Duct Tape",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "MAP Recon Backpack",
+      "quality": 4,
+      "quantity": 1,
+      "minutes": 720,
+      "materials": [
+        {
+          "item": "Polymer Fabric",
+          "quantity": 1,
+          "price": 16369
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "Field Hiking Backpack",
+      "quality": 4,
+      "quantity": 1,
+      "minutes": 720,
+      "materials": [
+        {
+          "item": "Polymer Fabric",
+          "quantity": 1,
+          "price": 16369
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "D2 Tactical Climbing Bag",
+      "quality": 4,
+      "quantity": 1,
+      "minutes": 720,
+      "materials": [
+        {
+          "item": "Polymer Fabric",
+          "quantity": 1,
+          "price": 16369
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "GT1 Outdoor Climbing Bag",
+      "quality": 4,
+      "quantity": 1,
+      "minutes": 720,
+      "materials": [
+        {
+          "item": "Polymer Fabric",
+          "quantity": 1,
+          "price": 16369
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "Survival Tactical Backpack",
+      "quality": 4,
+      "quantity": 1,
+      "minutes": 720,
+      "materials": [
+        {
+          "item": "Polymer Fabric",
+          "quantity": 1,
+          "price": 16369
+        },
+        {
+          "item": "Duct Tape",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "Mask-1 Iron Helmet",
+      "quality": 5,
+      "quantity": 1,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Titanium Alloy",
+          "quantity": 2
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "H09 Anti-Riot Helmet",
+      "quality": 5,
+      "quantity": 1,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Titanium Alloy",
+          "quantity": 2
+        },
+        {
+          "item": "Aramid Fiber",
+          "quantity": 1
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "GN Heavy Helmet",
+      "quality": 5,
+      "quantity": 1,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Titanium Alloy",
+          "quantity": 2
+        },
+        {
+          "item": "Aramid Fiber",
+          "quantity": 1
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 2
+        },
+        {
+          "item": "Manometer",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "DICH-1 Tactical Helmet",
+      "quality": 5,
+      "quantity": 1,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Titanium Alloy",
+          "quantity": 2
+        },
+        {
+          "item": "High-Power Crusher",
+          "quantity": 1
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "DICH Training Helmet",
+      "quality": 4,
+      "quantity": 1,
+      "minutes": 840,
+      "materials": [
+        {
+          "item": "Ceramic Armor",
+          "quantity": 1,
+          "price": 36603
+        },
+        {
+          "item": "Screwdriver",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "D6 Tactical Helmet",
+      "quality": 4,
+      "quantity": 1,
+      "minutes": 840,
+      "materials": [
+        {
+          "item": "Ceramic Armor",
+          "quantity": 1,
+          "price": 36603
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "GT1 Tactical Helmet",
+      "quality": 4,
+      "quantity": 1,
+      "minutes": 840,
+      "materials": [
+        {
+          "item": "Ceramic Armor",
+          "quantity": 1,
+          "price": 36603
+        },
+        {
+          "item": "Screwdriver",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "MHS Tactical Helmet",
+      "quality": 4,
+      "quantity": 1,
+      "minutes": 840,
+      "materials": [
+        {
+          "item": "Ceramic Armor",
+          "quantity": 1,
+          "price": 36603
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "Elite Vest",
+      "quality": 5,
+      "quantity": 1,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Titanium Alloy",
+          "quantity": 2
+        },
+        {
+          "item": "High-Power Crusher",
+          "quantity": 1
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "Hvk-2 Vest",
+      "quality": 5,
+      "quantity": 1,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Titanium Alloy",
+          "quantity": 2
+        },
+        {
+          "item": "High-Power Crusher",
+          "quantity": 1
+        },
+        {
+          "item": "Aramid Fiber",
+          "quantity": 1
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 3
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "FS Composite Vest",
+      "quality": 5,
+      "quantity": 1,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Titanium Alloy",
+          "quantity": 3
+        },
+        {
+          "item": "High-Power Crusher",
+          "quantity": 1
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "Heavy Assault Vest",
+      "quality": 5,
+      "quantity": 1,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Titanium Alloy",
+          "quantity": 3
+        },
+        {
+          "item": "Aramid Fiber",
+          "quantity": 3
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "HMP Special Ops Vest",
+      "quality": 4,
+      "quantity": 1,
+      "minutes": 960,
+      "materials": [
+        {
+          "item": "Ceramic Armor",
+          "quantity": 1,
+          "price": 36603
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "Assault Vest",
+      "quality": 4,
+      "quantity": 1,
+      "minutes": 960,
+      "materials": [
+        {
+          "item": "Ceramic Armor",
+          "quantity": 1,
+          "price": 36603
+        },
+        {
+          "item": "Seasoning Set",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "DT-AVS Vest",
+      "quality": 4,
+      "quantity": 1,
+      "minutes": 960,
+      "materials": [
+        {
+          "item": "Ceramic Armor",
+          "quantity": 1,
+          "price": 36603
+        },
+        {
+          "item": "Seasoning Set",
+          "quantity": 1
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 1
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "MK-2 Tactical Vest",
+      "quality": 4,
+      "quantity": 1,
+      "minutes": 960,
+      "materials": [
+        {
+          "item": "Ceramic Armor",
+          "quantity": 1,
+          "price": 36603
+        },
+        {
+          "item": "Seasoning Set",
+          "quantity": 1
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 1
+        },
+        {
+          "item": "Angle Grinder",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "GN Heavy NV Helmet",
+      "quality": 5,
+      "quantity": 1,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Lens",
+          "quantity": 1
+        },
+        {
+          "item": "High-Power Crusher",
+          "quantity": 2
+        },
+        {
+          "item": "Aramid Fiber",
+          "quantity": 1
+        },
+        {
+          "item": "Wood Board",
+          "quantity": 3
+        }
+      ]
+    },
+    {
+      "workshop": "Armor Bench",
+      "item": "GN Endurance Heavy NV Helmet",
+      "quality": 5,
+      "quantity": 1,
+      "minutes": 480,
+      "materials": [
+        {
+          "item": "Damaged Thermal Imager",
+          "quantity": 1
+        },
+        {
+          "item": "Aramid Fiber",
+          "quantity": 1
+        }
+      ]
+    }
+  ]
+}

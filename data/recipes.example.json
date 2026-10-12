@@ -1,0 +1,26 @@
+{
+  "intermediates": [
+    {
+      "item": "Example Intermediate",
+      "quantity": 4,
+      "materials": [
+        { "item": "Example Material A", "quantity": 1 },
+        { "item": "Example Material B", "quantity": 1 }
+      ]
+    }
+  ],
+  "recipes": [
+    {
+      "workshop": "Workbench",
+      "item": "5.7x28mm",
+      "quality": 5,
+      "quantity": 120,
+      "minutes": 480,
+      "materials": [
+        { "item": "Example Intermediate", "quantity": 2 },
+        { "item": "Gunpowder", "quantity": 2 },
+        { "item": "Material Not Sold On Market", "quantity": 1, "price": 5000 }
+      ]
+    }
+  ]
+}
