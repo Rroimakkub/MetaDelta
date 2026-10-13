@@ -71,7 +71,7 @@ async function fetchPrices(config, recipes, intermediates) {
   const results = await mapLimit(unique, 4, async (ref) => {
     const item = ref.id ? { id: ref.id, name: ref.item } : await findItem(config, ref.item, ref.quality);
     const { price } = await fetchMarketPrice(config, item);
-    return { price, name: item.name, icon: item.iconUrl };
+    return { price, id: item.id, name: item.name, icon: item.iconUrl };
   });
   const found = new Map();
   const errors = new Map();
@@ -102,6 +102,18 @@ export async function getCraftRecommendations(config) {
     return hit ? { price: hit.price } : { missing: [`${ref.item}: ${errors.get(refKey(ref)) ?? 'no price'}`] };
   }
 
+  // Name, id and icon for display. Fixed-price and crafted materials have no market lookup,
+  // so they are matched against the cached catalog; unknown names just show as text.
+  const described = new Map();
+  async function describe(ref) {
+    const key = refKey(ref);
+    if (!described.has(key)) {
+      const hit = found.get(key) ?? (await findItem(config, ref.item, ref.quality).catch(() => null));
+      described.set(key, hit ? { id: hit.id, name: hit.name, icon: hit.icon ?? hit.iconUrl } : { name: ref.item });
+    }
+    return described.get(key);
+  }
+
   const crafts = [];
   const skipped = [];
   for (const recipe of recipes) {
@@ -114,7 +126,19 @@ export async function getCraftRecommendations(config) {
     }
     const quantity = recipe.quantity ?? 1;
     const materials = inputs.reduce((sum, part, i) => sum + part.price * (recipe.materials[i].quantity ?? 1), 0);
+    const materialList = [];
+    for (const [i, ref] of recipe.materials.entries()) {
+      const count = ref.quantity ?? 1;
+      materialList.push({
+        ...(await describe(ref)),
+        quantity: count,
+        unitPrice: inputs[i].price,
+        total: Math.round(inputs[i].price * count),
+        source: ref.price != null ? 'fixed' : intermediates.has(refKey(ref)) ? 'crafted' : 'market',
+      });
+    }
     crafts.push({
+      materialList,
       workshop: recipe.workshop,
       item: found.get(refKey(recipe))?.name ?? recipe.item,
       icon: found.get(refKey(recipe))?.icon,

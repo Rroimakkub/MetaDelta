@@ -37,6 +37,11 @@ export function getConfig() {
     throw new Error('TOP_PER_WORKSHOP must be a whole number from 1 to 10.');
   }
 
+  const trackIntervalMinutes = Number(process.env.TRACK_INTERVAL_MINUTES ?? 10);
+  if (!(Number.isInteger(trackIntervalMinutes) && trackIntervalMinutes >= 5 && trackIntervalMinutes <= 120)) {
+    throw new Error('TRACK_INTERVAL_MINUTES must be a whole number from 5 to 120.');
+  }
+
   return {
     botToken: process.env.DISCORD_BOT_TOKEN,
     clientId: process.env.DISCORD_CLIENT_ID,
@@ -55,5 +60,6 @@ export function getConfig() {
     postTime,
     sellTaxPercent,
     topPerWorkshop,
+    trackIntervalMinutes,
   };
 }

@@ -14,7 +14,11 @@ export async function callApi(config, method, body) {
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(15_000),
   });
-  if (!response.ok) throw new Error(`DeltaForce API ${method} responded with HTTP ${response.status}.`);
+  if (!response.ok) {
+    const error = new Error(`DeltaForce API ${method} responded with HTTP ${response.status}.`);
+    error.status = response.status;
+    throw error;
+  }
   return response.json();
 }
 
@@ -121,8 +125,71 @@ function makeCraftEmbed(craft, rank, showRank) {
       `กำไร \`${formatPrice(profit)}\` / รอบ${roi == null ? '' : `  •  ROI ${roi}%`}`,
       `ขายได้ \`${formatPrice(craft.sale)}\`  •  ต้นทุน \`${formatPrice(craft.materials)}\``,
     ].join('\n'));
+  // The material card image is attached by makeWorkshopMessages; list the materials as text only without it.
+  if (craft.materialList?.length && !craft.materialsImage) {
+    embed.addFields({ name: 'วัตถุดิบ', value: formatMaterials(craft.materialList) });
+  }
   if (craft.icon) embed.setThumbnail(craft.icon);
   return embed;
+}
+
+const SOURCE_NOTES = { crafted: '  ·  คราฟเอง', fixed: '  ·  ราคาประเมิน' };
+
+function formatMaterials(materials) {
+  const lines = materials.map((material) => {
+    const each = material.quantity > 1 ? ` (${formatPrice(Math.round(material.unitPrice))}/ชิ้น)` : '';
+    return `${material.name} ×${formatPrice(material.quantity)}  —  \`${formatPrice(material.total)}\`${each}${SOURCE_NOTES[material.source] ?? ''}`;
+  });
+  while (lines.join('\n').length > 1_024) lines.pop();
+  return lines.join('\n');
+}
+
+// In-game order of the Black Site workshops, shown left to right, top to bottom in the 2×2 grid.
+export const WORKSHOPS = ['Cyber Warfare Division', 'Workbench', 'Pharmacy', 'Armor Bench'];
+
+// One cell per workshop with its best profitable craft. Workshops without recipes still get an empty cell.
+export function workshopCells(groups) {
+  const best = new Map(topCrafts(groups, 1).map(({ workshop, crafts }) => [workshop, crafts[0] ?? null]));
+  const names = [...WORKSHOPS, ...[...best.keys()].filter((name) => !WORKSHOPS.includes(name))];
+  return names.map((workshop) => {
+    if (!best.has(workshop)) return { workshop, craft: null };
+    const craft = best.get(workshop);
+    return craft ? { workshop, craft } : { workshop, craft: null, message: 'ไม่มีสูตรที่ได้กำไรตอนนี้', hint: 'ราคาวัตถุดิบสูงกว่าราคาขาย' };
+  });
+}
+
+function cellSummary(cell) {
+  if (!cell.craft) return cell.message ?? 'ยังไม่มีสูตร';
+  const { profit, profitPerHour } = calculateCraft(cell.craft);
+  return `**${cell.craft.item}${cell.craft.tier ? ` T${cell.craft.tier}` : ''}**\n🟢 \`${formatPrice(profitPerHour)}\` / ชม.\nกำไร \`${formatPrice(profit)}\` / รอบ`;
+}
+
+// Text version of the grid (two cells per row; an empty inline field forces the line break) above the grid image.
+export function makeWorkshopGridMessage(cells, { footer, notes = [], image }) {
+  const spacer = { name: '​', value: '​', inline: true };
+  const fields = cells.flatMap((cell, index) => {
+    const field = { name: `🏭 ${cell.workshop}`, value: cellSummary(cell), inline: true };
+    return index % 2 === 1 || index === cells.length - 1 ? [field, spacer] : [field];
+  });
+  const embed = new EmbedBuilder()
+    .setColor(0x18a558)
+    .setTitle('Black Site Workshop — คำแนะนำการคราฟ')
+    .setDescription(['คราฟต์ที่แนะนำที่สุดในแต่ละแผนก', '`กำไร = ราคาขายหลังหักภาษี − ต้นทุนวัตถุดิบ`', ...notes].join('\n'))
+    .addFields(fields)
+    .setFooter({ text: footer })
+    .setTimestamp();
+  if (!image) return { embeds: [embed] };
+  embed.setImage('attachment://workshops.png');
+  return { embeds: [embed], files: [{ attachment: image, name: 'workshops.png' }] };
+}
+
+// The crafts a post shows: profitable ones only, best first, at most `top` per workshop.
+export function topCrafts(groups, top) {
+  const limit = Math.min(top, 10);
+  return groups.map(({ workshop, crafts }) => ({
+    workshop,
+    crafts: crafts.filter((craft) => calculateCraft(craft).profitPerHour > 0).slice(0, limit),
+  }));
 }
 
 // One embed per craft so each item can show its icon. The first embed of each workshop carries its name.
@@ -135,24 +202,37 @@ export function makeWorkshopMessages(groups, { footer, notes = [], top = 1 }) {
     ...notes,
   ].join('\n');
 
-  const workshopEmbeds = groups.map(({ workshop, crafts }) => {
-    const profitable = crafts.filter((craft) => calculateCraft(craft).profitPerHour > 0).slice(0, limit);
-    const embeds = profitable.length
-      ? profitable.map((craft, rank) => makeCraftEmbed(craft, rank + 1, limit > 1))
-      : [new EmbedBuilder().setColor(0xe74c3c).setDescription('🔴 ไม่มีสูตรที่ได้กำไรตอนนี้')];
-    embeds[0].setAuthor({ name: `🏭 ${workshop}` });
-    return embeds;
+  // Each card is an embed plus an optional material image uploaded with the same message.
+  const workshopCards = topCrafts(groups, limit).map(({ workshop, crafts: profitable }) => {
+    const cards = profitable.length
+      ? profitable.map((craft, rank) => ({ embed: makeCraftEmbed(craft, rank + 1, limit > 1), image: craft.materialsImage }))
+      : [{ embed: new EmbedBuilder().setColor(0xe74c3c).setDescription('🔴 ไม่มีสูตรที่ได้กำไรตอนนี้') }];
+    cards[0].embed.setAuthor({ name: `🏭 ${workshop}` });
+    return cards;
   });
 
-  const messages = [];
-  for (const embeds of workshopEmbeds) {
-    const last = messages.at(-1);
-    if (last && last.embeds.length + embeds.length <= 10) last.embeds.push(...embeds);
-    else messages.push({ embeds: [...embeds] });
+  const batches = [];
+  for (const cards of workshopCards) {
+    const last = batches.at(-1);
+    if (last && last.length + cards.length <= 10) last.push(...cards);
+    else batches.push([...cards]);
   }
-  for (const message of messages) message.embeds.at(-1).setFooter({ text: footer }).setTimestamp();
-  if (messages.length) messages[0].content = intro;
-  return messages;
+
+  return batches.map((cards, index) => {
+    const files = [];
+    for (const { embed, image } of cards) {
+      if (!image) continue;
+      const name = `materials-${files.length + 1}.png`;
+      files.push({ attachment: image, name });
+      embed.setImage(`attachment://${name}`);
+    }
+    const embeds = cards.map(({ embed }) => embed);
+    embeds.at(-1).setFooter({ text: footer }).setTimestamp();
+    const message = { embeds };
+    if (index === 0) message.content = intro;
+    if (files.length) message.files = files;
+    return message;
+  });
 }
 
 // Discord's image proxy cannot fetch from the DeltaForceAPI CDN, so download each thumbnail here
@@ -173,7 +253,7 @@ export async function attachThumbnails(message) {
       embed.setThumbnail(null);
     }
   }
-  return files.length ? { ...message, files } : message;
+  return files.length ? { ...message, files: [...(message.files ?? []), ...files] } : message;
 }
 
 export function makeDemoWorkshopMessages() {
