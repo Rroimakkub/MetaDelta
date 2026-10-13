@@ -2,7 +2,7 @@
   "source": "DF - Black Site Crafting Costs S11.xlsx",
   "intermediates": [
     {
-      "item": "Int Ammo Prod",
+      "item": "Intermediate Ammo Production Parts",
       "quantity": 4,
       "materials": [
         {
@@ -313,7 +313,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 3
         },
         {
@@ -338,7 +338,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 3
         },
         {
@@ -364,7 +364,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 3
         },
         {
@@ -389,7 +389,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 3
         },
         {
@@ -415,7 +415,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 3
         },
         {
@@ -432,7 +432,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 4
         },
         {
@@ -457,7 +457,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 3
         },
         {
@@ -482,7 +482,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 2
         },
         {
@@ -499,7 +499,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 2
         },
         {
@@ -516,7 +516,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 2
         },
         {
@@ -541,7 +541,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 2
         },
         {
@@ -567,7 +567,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 2
         },
         {
@@ -589,7 +589,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 3
         },
         {
@@ -614,7 +614,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 3
         },
         {
@@ -640,7 +640,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 3
         },
         {
@@ -661,7 +661,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 3
         },
         {
@@ -686,7 +686,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 2
         },
         {
@@ -712,7 +712,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 3
         },
         {
@@ -754,7 +754,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 2
         },
         {
@@ -800,7 +800,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 3
         },
         {
@@ -850,7 +850,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 3
         },
         {
@@ -892,7 +892,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 2
         },
         {
@@ -909,7 +909,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 3
         },
         {
@@ -930,7 +930,7 @@
       "minutes": 420,
       "materials": [
         {
-          "item": "Int Ammo Prod",
+          "item": "Intermediate Ammo Production Parts",
           "quantity": 3
         },
         {

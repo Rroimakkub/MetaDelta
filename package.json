@@ -8,13 +8,18 @@
     "create-key": "node src/create-api-key.js",
     "find-items": "node src/find-items.js",
     "register": "node src/register-commands.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "bot:start": "pm2 start ecosystem.config.cjs && pm2 save",
+    "bot:restart": "pm2 restart metadelta-bot",
+    "bot:stop": "pm2 stop metadelta-bot && pm2 save",
+    "bot:logs": "pm2 logs metadelta-bot --lines 50"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
     "discord.js": "^14.21.0",
-    "dotenv": "^16.6.1"
+    "dotenv": "^16.6.1",
+    "sharp": "^0.34.5"
   }
 }
