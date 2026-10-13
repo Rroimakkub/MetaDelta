@@ -235,6 +235,18 @@ export function makeWorkshopMessages(groups, { footer, notes = [], top = 1 }) {
   });
 }
 
+// One craft on demand (/craft): the usual card plus where it ranks in its workshop and the materials card.
+export function makeCraftDetailMessage(craft, { rank, total, image, footer }) {
+  const embed = makeCraftEmbed({ ...craft, materialsImage: image }, rank, false)
+    .setAuthor({ name: `🏭 ${craft.workshop}  •  อันดับ ${rank} จาก ${total} สูตร` })
+    .setFooter({ text: footer })
+    .setTimestamp();
+  if (calculateCraft(craft).profitPerHour <= 0) embed.setColor(0xed4245);
+  if (!image) return { embeds: [embed] };
+  embed.setImage('attachment://materials.png');
+  return { embeds: [embed], files: [{ attachment: image, name: 'materials.png' }] };
+}
+
 // Discord's image proxy cannot fetch from the DeltaForceAPI CDN, so download each thumbnail here
 // and upload it with the message. Thumbnails that fail to download are dropped.
 export async function attachThumbnails(message) {

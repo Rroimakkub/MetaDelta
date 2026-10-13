@@ -1,12 +1,13 @@
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { getConfig } from './config.js';
-import { getCraftRecommendations } from './crafting.js';
+import { craftKey, getCachedCraftRecommendations, loadRecipes } from './crafting.js';
 import {
-  attachThumbnails, fetchMarketPrice, makeDemoWorkshopMessages, makeMarketEmbed, makeWorkshopGridMessage, makeWorkshopMessages, topCrafts, workshopCells,
+  attachThumbnails, fetchMarketPrice, makeCraftDetailMessage, makeDemoWorkshopMessages, makeMarketEmbed, makeWorkshopGridMessage, makeWorkshopMessages,
+  normalizeName, topCrafts, workshopCells,
 } from './deltaforce.js';
 import { makeWorkshopGrid } from './workshop-grid.js';
 import {
-  fetchPlayerReport, findPlayer, LIFETIME, listSeasons, makeMatchesMessage, makePlayerMessage, playerButtons, PlayerNotFoundError, seasonLabel,
+  fetchPlayerReport, findPlayer, LIFETIME, listSeasons, makeMatchesMessage, makeMatchNotification, makePlayerMessage, playerButtons, PlayerNotFoundError, seasonLabel,
 } from './player.js';
 import { makeMaterialsImage } from './recipe-card.js';
 import { getAllChannels, getChannel, setChannel } from './store.js';
@@ -28,7 +29,7 @@ async function postToChannel(channelId) {
 }
 
 async function makeCraftMessages() {
-  const { groups, skipped } = await getCraftRecommendations(config);
+  const { groups, skipped } = await getCachedCraftRecommendations(config, { fresh: true });
   for (const { recipe, reasons } of skipped) console.warn(`Skipped recipe ${recipe.item}: ${reasons.join('; ')}`);
   if (!groups.length) throw new Error('Could not price any recipe in data/recipes.json.');
   const notes = skipped.length ? [`⚠️ ข้าม ${skipped.length} สูตรเพราะดึงราคาไม่ได้`] : [];
@@ -84,10 +85,34 @@ function scheduleDailyPost() {
   setInterval(() => checkSchedule().catch((error) => console.error('Schedule check failed:', error.message)), 30_000);
 }
 
+// Posts each new match in the stats channel of every server tracking that player.
+// MATCH_NOTIFY=pinned (default) only announces players added with /track add, so players who were
+// merely looked up with /player don't fill the channel.
+async function announceMatches(newEvents) {
+  if (config.matchNotify === 'off') return;
+  for (const { name, pinned, guildIds, event } of newEvents) {
+    if (config.matchNotify === 'pinned' && !pinned) continue;
+    for (const guildId of guildIds) {
+      const channelId = await getChannel(guildId, 'stats');
+      if (!channelId) continue;
+      try {
+        const channel = await client.channels.fetch(channelId);
+        if (channel?.isTextBased()) await channel.send(makeMatchNotification(name, event));
+      } catch (error) {
+        console.warn(`Could not announce a match for ${name} in guild ${guildId}:`, error.message);
+      }
+    }
+  }
+}
+
 function scheduleTracking() {
   if (config.demoMode) return;
   const run = () => pollTrackedPlayers(config)
-    .then((count) => count && console.log(`Tracking: recorded ${count} new match event(s).`))
+    .then(async (newEvents) => {
+      if (!newEvents.length) return;
+      console.log(`Tracking: recorded ${newEvents.length} new match event(s).`);
+      await announceMatches(newEvents);
+    })
     .catch((error) => console.error('Tracking poll failed:', error.message));
   console.log(`Tracking players every ${config.trackIntervalMinutes} minutes.`);
   run();
@@ -122,6 +147,25 @@ async function suggestTracked(interaction) {
     .map((player) => ({ name: player.name, value: player.name })));
 }
 
+// Recipe names come straight from data/recipes.json so autocomplete answers within Discord's 3-second limit.
+async function suggestCrafts(interaction) {
+  const typed = normalizeName(interaction.options.getFocused());
+  const { recipes } = await loadRecipes();
+  await interaction.respond(recipes
+    .map((recipe) => ({ name: `${recipe.item}${recipe.quality ? ` T${recipe.quality}` : ''} · ${recipe.workshop}`.slice(0, 100), value: craftKey(recipe) }))
+    .filter((choice) => normalizeName(choice.name).includes(typed))
+    .slice(0, 25));
+}
+
+// Finds a craft by its autocomplete key, or by name when the user typed text without picking a suggestion.
+function findCraft(groups, query) {
+  const all = groups.flatMap(({ crafts }) => crafts);
+  const byKey = all.find((craft) => craft.key === query);
+  if (byKey) return byKey;
+  const typed = normalizeName(query);
+  return all.find((craft) => normalizeName(craft.item) === typed) ?? all.find((craft) => normalizeName(craft.item).includes(typed)) ?? null;
+}
+
 async function suggestSeasons(interaction) {
   const typed = interaction.options.getFocused().toLocaleLowerCase();
   const seasons = config.demoMode ? [] : await listSeasons(config).catch(() => []);
@@ -134,7 +178,7 @@ async function suggestSeasons(interaction) {
 
 client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isAutocomplete()) {
-    const suggest = interaction.commandName === 'player' ? suggestSeasons : interaction.commandName === 'track' ? suggestTracked : null;
+    const suggest = { player: suggestSeasons, track: suggestTracked, craft: suggestCrafts }[interaction.commandName];
     return suggest?.(interaction).catch((error) => console.error('Autocomplete failed:', error.message));
   }
   if (interaction.isButton() && interaction.customId.startsWith('player|')) {
@@ -175,6 +219,23 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (!channelId) return interaction.editReply('ยังไม่ได้ตั้งห้อง ใช้ /setchannel ก่อน');
       await postToChannel(channelId);
       return interaction.editReply(`โพสต์ราคาตลาดไปที่ <#${channelId}> แล้ว`);
+    }
+    if (interaction.commandName === 'craft') {
+      if (config.demoMode) return interaction.reply({ content: 'คำสั่งนี้ต้องใช้ข้อมูลจริงจาก API ตั้ง DEMO_MODE=false ก่อน', ephemeral: true });
+      const query = interaction.options.getString('item', true);
+      await interaction.deferReply();
+      const { groups, skipped } = await getCachedCraftRecommendations(config);
+      const craft = findCraft(groups, query);
+      if (!craft) {
+        const failed = skipped.find(({ recipe }) => craftKey(recipe) === query);
+        return interaction.editReply(failed ? `ดึงราคาของ **${failed.recipe.item}** ไม่ได้ตอนนี้ ลองใหม่ภายหลัง` : 'ไม่พบสูตรนี้ เลือกชื่อจากรายการที่ขึ้นตอนพิมพ์');
+      }
+      const workshopCrafts = groups.find((group) => group.workshop === craft.workshop).crafts;
+      const image = await makeMaterialsImage(craft.materialList, craft.materials).catch(() => null);
+      const message = makeCraftDetailMessage(craft, {
+        rank: workshopCrafts.indexOf(craft) + 1, total: workshopCrafts.length, image, footer: 'ราคาจาก deltaforceapi.com (อัปเดตทุก 10 นาที)',
+      });
+      return interaction.editReply(await attachThumbnails(message));
     }
     if (interaction.commandName === 'player') {
       if (config.demoMode) return interaction.reply({ content: 'คำสั่งนี้ต้องใช้ข้อมูลจริงจาก API ตั้ง DEMO_MODE=false ก่อน', ephemeral: true });

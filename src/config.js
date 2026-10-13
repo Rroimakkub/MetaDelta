@@ -42,6 +42,11 @@ export function getConfig() {
     throw new Error('TRACK_INTERVAL_MINUTES must be a whole number from 5 to 120.');
   }
 
+  const matchNotify = process.env.MATCH_NOTIFY ?? 'pinned';
+  if (!['pinned', 'all', 'off'].includes(matchNotify)) {
+    throw new Error('MATCH_NOTIFY must be pinned, all or off.');
+  }
+
   return {
     botToken: process.env.DISCORD_BOT_TOKEN,
     clientId: process.env.DISCORD_CLIENT_ID,
@@ -61,5 +66,6 @@ export function getConfig() {
     sellTaxPercent,
     topPerWorkshop,
     trackIntervalMinutes,
+    matchNotify,
   };
 }

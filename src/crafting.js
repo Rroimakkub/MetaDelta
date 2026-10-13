@@ -6,6 +6,9 @@ import { calculateCraft, fetchMarketPrice, findItem, normalizeName } from './del
 const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../data/recipes.json');
 
 const refKey = (ref) => `${normalizeName(ref.item)}|${ref.quality ?? ''}`;
+// Identifies a recipe across reloads (used as the /craft autocomplete value).
+export const craftKey = (recipe) => `${normalizeName(recipe.workshop)}|${refKey(recipe)}`;
+const CACHE_MS = 10 * 60 * 1000;
 
 function checkRef(ref, where) {
   if (!ref || typeof ref.item !== 'string' || !ref.item.trim()) throw new Error(`${where}: "item" must be an English item name.`);
@@ -138,6 +141,7 @@ export async function getCraftRecommendations(config) {
       });
     }
     crafts.push({
+      key: craftKey(recipe),
       materialList,
       workshop: recipe.workshop,
       item: found.get(refKey(recipe))?.name ?? recipe.item,
@@ -160,4 +164,17 @@ export async function getCraftRecommendations(config) {
     crafts: list.sort((a, b) => calculateCraft(b).profitPerHour - calculateCraft(a).profitPerHour),
   }));
   return { groups, skipped };
+}
+
+let cache = null;
+
+// Pricing every recipe takes ~100 API calls, so on-demand lookups (/craft) reuse results up to 10 minutes old.
+// The daily post passes fresh: true, which also refreshes the cache for later lookups.
+export function getCachedCraftRecommendations(config, { fresh = false } = {}) {
+  if (fresh || !cache || Date.now() - cache.at > CACHE_MS) {
+    const result = getCraftRecommendations(config);
+    cache = { at: Date.now(), result };
+    result.catch(() => { if (cache?.result === result) cache = null; });
+  }
+  return cache.result;
 }

@@ -18,6 +18,10 @@ const commands = [
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   new SlashCommandBuilder().setName('botstatus').setDescription('ดูการตั้งค่าห้องโพสต์ของบอต'),
   new SlashCommandBuilder()
+    .setName('craft')
+    .setDescription('ดูสูตร กำไร และวัตถุดิบของไอเทมที่คราฟได้')
+    .addStringOption((option) => option.setName('item').setDescription('ชื่อไอเทม').setRequired(true).setAutocomplete(true)),
+  new SlashCommandBuilder()
     .setName('player')
     .setDescription('ดูสถิติผู้เล่น Delta Force โหมด Operations')
     .addStringOption((option) => option.setName('name').setDescription('ชื่อในเกม หรือ Delta Force ID').setRequired(true).setMaxLength(64))

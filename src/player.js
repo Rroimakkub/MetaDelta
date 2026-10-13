@@ -220,17 +220,36 @@ export function playerButtons(playerId, seasonKey, active) {
 
 const toUnix = (iso) => Math.floor(new Date(iso).getTime() / 1000);
 
-function describeEvent(event) {
-  let result;
+function eventResult(event) {
   if (event.matchesPlayed === 1) {
-    result = event.matchesExtracted > 0 ? '✅ ถอนตัวสำเร็จ' : event.matchesQuit > 0 ? '🏃 ออกกลางคัน' : '❌ ล้มเหลว';
-  } else {
-    const parts = [event.matchesExtracted && `✅${event.matchesExtracted}`, event.matchesLost && `❌${event.matchesLost}`, event.matchesQuit && `🏃${event.matchesQuit}`].filter(Boolean);
-    result = `🎮 ${event.matchesPlayed} แมตช์${parts.length ? ` (${parts.join(' ')})` : ''}`;
+    return event.matchesExtracted > 0 ? '✅ ถอนตัวสำเร็จ' : event.matchesQuit > 0 ? '🏃 ออกกลางคัน' : '❌ ล้มเหลว';
   }
+  const parts = [event.matchesExtracted && `✅${event.matchesExtracted}`, event.matchesLost && `❌${event.matchesLost}`, event.matchesQuit && `🏃${event.matchesQuit}`].filter(Boolean);
+  return `🎮 ${event.matchesPlayed} แมตช์${parts.length ? ` (${parts.join(' ')})` : ''}`;
+}
+
+function eventExtras(event) {
   const extras = [`ฆ่า ${formatNumber(event.totalKills)}`, `ตาย ${formatNumber(event.totalDeaths)}`, `ขนออก ${formatCompact(event.extractedAssets)}`];
   if (event.extractedMandlebricks > 0) extras.push(`Mandelbrick ${event.extractedMandlebricks}`);
-  return `<t:${toUnix(event.at)}:R>  ${result}\n└ ${extras.join('  •  ')}`;
+  return extras.join('  •  ');
+}
+
+function describeEvent(event) {
+  return `<t:${toUnix(event.at)}:R>  ${eventResult(event)}\n└ ${eventExtras(event)}`;
+}
+
+// Posted in the stats channel when a tracked player finishes a match.
+export function makeMatchNotification(playerName, event) {
+  const extracted = event.matchesExtracted > 0 && event.matchesExtracted >= event.matchesLost;
+  return {
+    embeds: [new EmbedBuilder()
+      .setColor(extracted ? 0x57f287 : 0xed4245)
+      .setAuthor({ name: 'Delta Force — Operations  •  แมตช์ใหม่' })
+      .setTitle(playerName)
+      .setDescription(`${eventResult(event)}\n${eventExtras(event)}`)
+      .setFooter({ text: event.matchesPlayed > 1 ? 'รวมหลายแมตช์ที่เล่นระหว่างการเช็กรอบก่อน' : 'ดูทั้งหมดได้ที่ปุ่ม 📜 แมตช์ล่าสุด ของ /player' })
+      .setTimestamp(new Date(event.at))],
+  };
 }
 
 export function makeMatchesMessage(playerName, tracking, { intervalMinutes }) {

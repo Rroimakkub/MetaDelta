@@ -122,20 +122,22 @@ function diff(previous, current) {
   return Object.fromEntries(COUNTERS.map((key) => [key, current[key] - previous[key]]));
 }
 
+// Returns the new match event, or null when nothing changed.
 async function pollPlayer(config, playerId, tracked) {
   // GetPlayer refreshes the player's record; the stash lookup also feeds the API's stash history (used by the chart).
   const { player } = await callApi(config, 'GetPlayer', { id: playerId });
   if (player?.name) tracked.name = player.name;
   await callApi(config, 'GetPlayerOperationStashValue', { playerId }).catch(() => null);
   const snapshot = await fetchSnapshot(config, playerId);
-  if (!snapshot) return false;
+  if (!snapshot) return null;
   const previous = tracked.last;
   tracked.last = snapshot;
-  if (!previous || previous.ranked !== snapshot.ranked) return false;
+  if (!previous || previous.ranked !== snapshot.ranked) return null;
   const change = diff(previous, snapshot);
-  if (change.matchesPlayed <= 0) return false;
-  tracked.events = [{ from: previous.at, at: snapshot.at, ...change }, ...tracked.events].slice(0, MAX_EVENTS);
-  return true;
+  if (change.matchesPlayed <= 0) return null;
+  const event = { from: previous.at, at: snapshot.at, ...change };
+  tracked.events = [event, ...tracked.events].slice(0, MAX_EVENTS);
+  return event;
 }
 
 function dropExpired(data) {
@@ -150,10 +152,13 @@ function dropExpired(data) {
 async function pollOnce(config) {
   const data = await load();
   dropExpired(data);
-  let newEvents = 0;
+  const newEvents = [];
   for (const [playerId, tracked] of Object.entries(data.players)) {
     try {
-      if (await pollPlayer(config, playerId, tracked)) newEvents++;
+      const event = await pollPlayer(config, playerId, tracked);
+      if (!event) continue;
+      const guildIds = Object.entries(data.guilds).filter(([, ids]) => ids.includes(playerId)).map(([guildId]) => guildId);
+      newEvents.push({ playerId, name: tracked.name, pinned: Boolean(tracked.pinned), guildIds, event });
     } catch (error) {
       console.warn(`Could not poll player ${tracked.name}: ${error.message}`);
     }
@@ -162,7 +167,8 @@ async function pollOnce(config) {
   return newEvents;
 }
 
-// Checks every tracked player once. Errors for one player don't stop the others.
+// Checks every tracked player once and resolves to the new match events
+// ({ playerId, name, pinned, guildIds, event }). Errors for one player don't stop the others.
 // A poll that is still running is reused instead of starting a second one: two overlapping polls
 // would diff the same previous snapshot and record every match twice.
 export function pollTrackedPlayers(config) {
