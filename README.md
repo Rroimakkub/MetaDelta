@@ -12,7 +12,23 @@ Discord bot สำหรับโพสต์คำแนะนำคราฟ�
 
 `npm run register` ลงทะเบียนคำสั่งเฉพาะในเซิร์ฟเวอร์ที่บอตอยู่ (ขึ้นทันที) ถ้าเชิญบอตเข้าเซิร์ฟเวอร์ใหม่ให้รันคำสั่งนี้อีกครั้ง
 
-เชิญบอตเข้าดิสคอร์ดด้วย scopes `bot` และ `applications.commands` และให้สิทธิ์ View Channel, Send Messages, Embed Links ในห้องปลายทาง
+เชิญบอตเข้าดิสคอร์ดด้วย scopes `bot` และ `applications.commands` และให้สิทธิ์ View Channel, Send Messages, Embed Links, Attach Files ในห้องปลายทาง
+
+## รันบอตตลอดเวลา
+
+ระบบติดตามแมตช์และโพสต์รายวันทำงานเฉพาะตอนที่บอตเปิดอยู่ ใช้ [pm2](https://pm2.keymetrics.io/) ให้บอตรันเบื้องหลังโดยไม่ต้องเปิด VS Code และเปิดใหม่เองถ้าพัง:
+
+```powershell
+npm install -g pm2
+npm run bot:start     # เริ่มบอตใน pm2 และบันทึกรายการไว้
+npm run bot:logs      # ดู log ล่าสุด
+npm run bot:restart   # รีสตาร์ทหลังแก้โค้ดหรือ .env
+npm run bot:stop      # หยุดบอต
+```
+
+อย่ารัน `npm start` พร้อมกับ pm2 ไม่งั้นจะมีบอต 2 ตัวตอบคำสั่งซ้ำ
+
+Windows ไม่รองรับ `pm2 startup` ให้บอตเปิดเองหลังรีสตาร์ทเครื่องด้วยไฟล์ `metadelta-bot-pm2.vbs` ในโฟลเดอร์ Startup (`shell:startup`) ที่รัน `pm2 resurrect` ตอนล็อกอิน ลบไฟล์นั้นถ้าไม่ต้องการให้เปิดเอง ถ้าปิดเครื่องหรือเครื่องหลับ บอตจะหยุดทำงานจนกว่าจะเปิดเครื่องอีกครั้ง
 
 ## ใช้ใน Discord
 
