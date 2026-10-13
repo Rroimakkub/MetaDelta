@@ -10,9 +10,23 @@ Discord bot สำหรับโพสต์คำแนะนำคราฟ�
 4. ใส่สูตรคราฟใน `data/recipes.json` (ดูหัวข้อ "คำแนะนำคราฟจากราคาจริง")
 5. ลงทะเบียนคำสั่งด้วย `npm run register` แล้วเปิดบอตด้วย `npm start`
 
-`npm run register` ลงทะเบียนคำสั่งเฉพาะในเซิร์ฟเวอร์ที่บอตอยู่ (ขึ้นทันที) ถ้าเชิญบอตเข้าเซิร์ฟเวอร์ใหม่ให้รันคำสั่งนี้อีกครั้ง
+บอตลงทะเบียนคำสั่งในทุกเซิร์ฟเวอร์ที่อยู่เองตอนเปิด และตอนถูกเชิญเข้าเซิร์ฟเวอร์ใหม่ (`npm run register` ใช้เฉพาะตอนบอตปิดอยู่)
 
-เชิญบอตเข้าดิสคอร์ดด้วย scopes `bot` และ `applications.commands` และให้สิทธิ์ View Channel, Send Messages, Embed Links, Attach Files ในห้องปลายทาง
+เชิญบอตเข้าดิสคอร์ดด้วย scopes `bot` และ `applications.commands` และให้สิทธิ์ View Channel, Send Messages, Embed Links, Attach Files ในห้องปลายทาง:
+
+```
+https://discord.com/oauth2/authorize?client_id=<DISCORD_CLIENT_ID>&scope=bot%20applications.commands&permissions=52224
+```
+
+## สิทธิ์การใช้คำสั่ง
+
+| คำสั่ง | ใครใช้ได้ |
+|---|---|
+| `/setchannel`, `/postnow`, `/trackrole` | แอดมิน (Manage Server) |
+| `/track add`, `/track remove` | แอดมิน และ role ที่ตั้งด้วย `/trackrole` |
+| `/player`, `/craft`, `/track list`, `/botstatus` | ทุกคน (`/player` และ `/craft` มี cooldown `COMMAND_COOLDOWN_SECONDS` ต่อคน ค่าเริ่มต้น 15 วินาที แอดมินไม่ติด) |
+
+แอดมินจำกัดคำสั่งให้เฉพาะ role หรือห้องเพิ่มเติมได้ที่ Server Settings → Integrations → บอต
 
 ## รันบอตตลอดเวลา
 

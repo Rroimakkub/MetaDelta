@@ -1,4 +1,5 @@
-import { Client, Events, GatewayIntentBits } from 'discord.js';
+import { Client, Events, GatewayIntentBits, MessageFlags } from 'discord.js';
+import { commands } from './commands.js';
 import { getConfig } from './config.js';
 import { craftKey, getCachedCraftRecommendations, loadRecipes } from './crafting.js';
 import {
@@ -9,8 +10,9 @@ import { makeWorkshopGrid } from './workshop-grid.js';
 import {
   fetchPlayerReport, findPlayer, LIFETIME, listSeasons, makeMatchesMessage, makeMatchNotification, makePlayerMessage, playerButtons, PlayerNotFoundError, seasonLabel,
 } from './player.js';
+import { canManageTracking, cooldownLeft, cooldownReply } from './permissions.js';
 import { makeMaterialsImage } from './recipe-card.js';
-import { getAllChannels, getChannel, setChannel } from './store.js';
+import { getAllChannels, getChannel, getGuildSetting, setChannel, setGuildSetting } from './store.js';
 import { getTracking, listTracked, MAX_PLAYERS_PER_GUILD, pollTrackedPlayers, touchPlayer, trackPlayer, untrackPlayer } from './tracking.js';
 
 const config = getConfig();
@@ -119,11 +121,25 @@ function scheduleTracking() {
   setInterval(run, config.trackIntervalMinutes * 60_000);
 }
 
-client.once(Events.ClientReady, (readyClient) => {
+// Keeps each server's slash commands in sync with src/commands.js, so moving or inviting the bot
+// needs no manual `npm run register`.
+async function registerCommands(guild) {
+  try {
+    await guild.commands.set(commands);
+    console.log(`Registered ${commands.length} commands in ${guild.name}.`);
+  } catch (error) {
+    console.error(`Could not register commands in ${guild.name}:`, error.message);
+  }
+}
+
+client.once(Events.ClientReady, async (readyClient) => {
   console.log(`Logged in as ${readyClient.user.tag}.`);
+  for (const guild of readyClient.guilds.cache.values()) await registerCommands(guild);
   scheduleDailyPost();
   scheduleTracking();
 });
+
+client.on(Events.GuildCreate, (guild) => registerCommands(guild));
 
 // Builds either view of a /player card with its toggle buttons. seasonKey is a season id, LIFETIME or 'current'.
 async function playerView(playerId, seasonKey, view) {
@@ -189,7 +205,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return await interaction.editReply({ files: [], attachments: [], ...(await playerView(playerId, seasonKey, view)) });
     } catch (error) {
       console.error(error);
-      return interaction.followUp({ content: 'ดึงข้อมูลผู้เล่นไม่สำเร็จ ลองใหม่อีกครั้งภายหลัง', ephemeral: true });
+      return interaction.followUp({ content: 'ดึงข้อมูลผู้เล่นไม่สำเร็จ ลองใหม่อีกครั้งภายหลัง', flags: MessageFlags.Ephemeral });
     }
   }
   if (!interaction.isChatInputCommand() || !interaction.guildId) return;
@@ -197,32 +213,48 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.commandName === 'setchannel') {
       const channel = interaction.options.getChannel('channel', true);
       const kind = interaction.options.getString('type') ?? 'market';
-      if (!channel.isTextBased()) return interaction.reply({ content: 'กรุณาเลือกห้องข้อความ', ephemeral: true });
+      if (!channel.isTextBased()) return interaction.reply({ content: 'กรุณาเลือกห้องข้อความ', flags: MessageFlags.Ephemeral });
       await setChannel(interaction.guildId, channel.id, kind);
       const what = kind === 'stats' ? 'ห้องสถิติผู้เล่น (ผลของ /player จะส่งมาที่นี่)' : 'ห้องตลาด (คำแนะนำคราฟรายวันและ /postnow)';
-      return interaction.reply({ content: `ตั้ง ${channel} เป็น${what}แล้ว`, ephemeral: true });
+      return interaction.reply({ content: `ตั้ง ${channel} เป็น${what}แล้ว`, flags: MessageFlags.Ephemeral });
+    }
+    if (interaction.commandName === 'trackrole') {
+      const role = interaction.options.getRole('role');
+      await setGuildSetting(interaction.guildId, 'trackerRole', role?.id ?? null);
+      return interaction.reply({
+        content: role ? `สมาชิกที่มี ${role} ใช้ /track add และ /track remove ได้แล้ว (แอดมินใช้ได้เสมอ)` : 'ล้าง role แล้ว ตอนนี้ /track add และ /track remove ใช้ได้เฉพาะแอดมิน',
+        allowedMentions: { parse: [] },
+        flags: MessageFlags.Ephemeral,
+      });
     }
     if (interaction.commandName === 'botstatus') {
-      const [market, stats] = await Promise.all([getChannel(interaction.guildId, 'market'), getChannel(interaction.guildId, 'stats')]);
+      const [market, stats, trackerRole] = await Promise.all([
+        getChannel(interaction.guildId, 'market'), getChannel(interaction.guildId, 'stats'), getGuildSetting(interaction.guildId, 'trackerRole'),
+      ]);
       return interaction.reply({
         content: [
           `ห้องตลาด: ${market ? `<#${market}>` : 'ยังไม่ได้ตั้ง (ใช้ /setchannel type:ตลาด)'}`,
           `ห้องสถิติ: ${stats ? `<#${stats}>` : 'ยังไม่ได้ตั้ง (ผล /player จะขึ้นในห้องที่พิมพ์)'}`,
+          `ใช้ /track add, remove ได้: แอดมิน${trackerRole ? ` และ <@&${trackerRole}>` : ' เท่านั้น (ตั้ง role ด้วย /trackrole)'}`,
+          `Cooldown ของ /player และ /craft: ${config.commandCooldownSeconds ? `${config.commandCooldownSeconds} วินาทีต่อคน (แอดมินไม่ติด)` : 'ปิด'}`,
           `เวลาโพสต์: ${config.postTime} (${config.timeZone})`,
         ].join('\n'),
-        ephemeral: true,
+        allowedMentions: { parse: [] },
+        flags: MessageFlags.Ephemeral,
       });
     }
     if (interaction.commandName === 'postnow') {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const channelId = await getChannel(interaction.guildId);
       if (!channelId) return interaction.editReply('ยังไม่ได้ตั้งห้อง ใช้ /setchannel ก่อน');
       await postToChannel(channelId);
       return interaction.editReply(`โพสต์ราคาตลาดไปที่ <#${channelId}> แล้ว`);
     }
     if (interaction.commandName === 'craft') {
-      if (config.demoMode) return interaction.reply({ content: 'คำสั่งนี้ต้องใช้ข้อมูลจริงจาก API ตั้ง DEMO_MODE=false ก่อน', ephemeral: true });
+      if (config.demoMode) return interaction.reply({ content: 'คำสั่งนี้ต้องใช้ข้อมูลจริงจาก API ตั้ง DEMO_MODE=false ก่อน', flags: MessageFlags.Ephemeral });
       const query = interaction.options.getString('item', true);
+      const wait = cooldownLeft(interaction, config.commandCooldownSeconds);
+      if (wait) return interaction.reply(cooldownReply(wait));
       await interaction.deferReply();
       const { groups, skipped } = await getCachedCraftRecommendations(config);
       const craft = findCraft(groups, query);
@@ -238,13 +270,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.editReply(await attachThumbnails(message));
     }
     if (interaction.commandName === 'player') {
-      if (config.demoMode) return interaction.reply({ content: 'คำสั่งนี้ต้องใช้ข้อมูลจริงจาก API ตั้ง DEMO_MODE=false ก่อน', ephemeral: true });
+      if (config.demoMode) return interaction.reply({ content: 'คำสั่งนี้ต้องใช้ข้อมูลจริงจาก API ตั้ง DEMO_MODE=false ก่อน', flags: MessageFlags.Ephemeral });
       const query = interaction.options.getString('name', true).trim();
       const seasonKey = interaction.options.getString('season') ?? 'current';
+      const wait = cooldownLeft(interaction, config.commandCooldownSeconds);
+      if (wait) return interaction.reply(cooldownReply(wait));
       // With a stats channel set, cards used elsewhere are posted there and the caller gets a private pointer.
       const statsChannelId = await getChannel(interaction.guildId, 'stats');
       const redirect = statsChannelId && statsChannelId !== interaction.channelId;
-      await interaction.deferReply({ ephemeral: Boolean(redirect) });
+      await interaction.deferReply(redirect ? { flags: MessageFlags.Ephemeral } : {});
       try {
         const report = await fetchPlayerReport(config, query, { seasonId: seasonKey === 'current' ? undefined : seasonKey });
         // Every looked-up player is tracked automatically so the Recent matches tab fills up without /track add.
@@ -262,7 +296,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
     }
     if (interaction.commandName === 'track') {
-      if (config.demoMode) return interaction.reply({ content: 'คำสั่งนี้ต้องใช้ข้อมูลจริงจาก API ตั้ง DEMO_MODE=false ก่อน', ephemeral: true });
+      if (config.demoMode) return interaction.reply({ content: 'คำสั่งนี้ต้องใช้ข้อมูลจริงจาก API ตั้ง DEMO_MODE=false ก่อน', flags: MessageFlags.Ephemeral });
       const sub = interaction.options.getSubcommand();
       if (sub === 'list') {
         const players = await listTracked(interaction.guildId);
@@ -271,15 +305,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
           content: lines.length
             ? `ผู้เล่นที่ติดตาม (${players.length}/${MAX_PLAYERS_PER_GUILD})  •  📌 ถาวร  🔄 อัตโนมัติจาก /player (หยุดเมื่อไม่มีใครดู 14 วัน)\n${lines.join('\n').slice(0, 1_800)}`
             : 'ยังไม่ได้ติดตามใคร ค้นหาด้วย `/player` หรือ `/track add` เพื่อเริ่มติดตาม',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
       const name = interaction.options.getString('name', true).trim();
+      if (!(await canManageTracking(interaction))) {
+        return interaction.reply({ content: '/track add และ /track remove ใช้ได้เฉพาะแอดมิน หรือ role ที่แอดมินตั้งไว้ด้วย /trackrole', flags: MessageFlags.Ephemeral });
+      }
       if (sub === 'remove') {
         const removed = await untrackPlayer(interaction.guildId, name);
-        return interaction.reply({ content: removed ? `เลิกติดตาม **${removed}** แล้ว` : `ไม่ได้ติดตามผู้เล่นชื่อ **${name}** อยู่`, ephemeral: true });
+        return interaction.reply({ content: removed ? `เลิกติดตาม **${removed}** แล้ว` : `ไม่ได้ติดตามผู้เล่นชื่อ **${name}** อยู่`, flags: MessageFlags.Ephemeral });
       }
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       try {
         const player = await findPlayer(config, name);
         const result = await trackPlayer(config, interaction.guildId, player, { pinned: true });
@@ -298,7 +335,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     console.error(error);
     const response = 'โพสต์ไม่สำเร็จ กรุณาตรวจสอบ API endpoint, API token และสิทธิ์ของบอตในห้องนั้น';
     if (interaction.deferred || interaction.replied) await interaction.editReply(response);
-    else await interaction.reply({ content: response, ephemeral: true });
+    else await interaction.reply({ content: response, flags: MessageFlags.Ephemeral });
   }
 });
 

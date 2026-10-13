@@ -19,19 +19,24 @@ async function save(data) {
   await writeFile(file, JSON.stringify(data, null, 2), 'utf8');
 }
 
-// Each server has a channel per kind: 'market' (daily craft post) and 'stats' (/player cards).
+// Per-server settings: 'market' and 'stats' channel ids, and 'trackerRole' (role allowed to use /track add/remove).
 // Older files stored a single channel id per server; that is treated as the market channel.
 const channelsOf = (entry) => (typeof entry === 'string' ? { market: entry } : entry ?? {});
 
-export async function setChannel(guildId, channelId, kind = 'market') {
-  const channels = await read();
-  channels[guildId] = { ...channelsOf(channels[guildId]), [kind]: channelId };
-  await save(channels);
+export async function setGuildSetting(guildId, key, value) {
+  const settings = await read();
+  const next = { ...channelsOf(settings[guildId]), [key]: value };
+  if (value == null) delete next[key];
+  settings[guildId] = next;
+  await save(settings);
 }
 
-export async function getChannel(guildId, kind = 'market') {
-  return channelsOf((await read())[guildId])[kind] ?? null;
+export async function getGuildSetting(guildId, key) {
+  return channelsOf((await read())[guildId])[key] ?? null;
 }
+
+export const setChannel = (guildId, channelId, kind = 'market') => setGuildSetting(guildId, kind, channelId);
+export const getChannel = (guildId, kind = 'market') => getGuildSetting(guildId, kind);
 
 export async function getAllChannels(kind = 'market') {
   return Object.entries(await read())

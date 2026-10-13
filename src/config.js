@@ -47,6 +47,11 @@ export function getConfig() {
     throw new Error('MATCH_NOTIFY must be pinned, all or off.');
   }
 
+  const commandCooldownSeconds = Number(process.env.COMMAND_COOLDOWN_SECONDS ?? 15);
+  if (!(Number.isInteger(commandCooldownSeconds) && commandCooldownSeconds >= 0 && commandCooldownSeconds <= 600)) {
+    throw new Error('COMMAND_COOLDOWN_SECONDS must be a whole number from 0 to 600.');
+  }
+
   return {
     botToken: process.env.DISCORD_BOT_TOKEN,
     clientId: process.env.DISCORD_CLIENT_ID,
@@ -67,5 +72,6 @@ export function getConfig() {
     topPerWorkshop,
     trackIntervalMinutes,
     matchNotify,
+    commandCooldownSeconds,
   };
 }
