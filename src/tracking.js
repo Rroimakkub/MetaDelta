@@ -15,18 +15,26 @@ const EXPIRE_AFTER_MS = 14 * 24 * 60 * 60 * 1000;
 const COUNTERS = ['matchesPlayed', 'matchesExtracted', 'matchesLost', 'matchesQuit', 'totalKills', 'totalDeaths', 'extractedAssets', 'extractedMandlebricks', 'playTime'];
 
 let state = null;
+let loading = null;
 let saving = Promise.resolve();
+let polling = null;
 
-async function load() {
-  if (!state) {
-    try {
-      state = JSON.parse(await readFile(file, 'utf8'));
-    } catch (error) {
+// Reads the file once. Callers that arrive while it is loading share the same promise, so two early
+// callers can't each read the file and overwrite the other's changes.
+function load() {
+  if (state) return Promise.resolve(state);
+  loading ??= readFile(file, 'utf8')
+    .then((text) => JSON.parse(text))
+    .catch((error) => {
       if (error.code !== 'ENOENT') throw error;
-      state = { guilds: {}, players: {} };
-    }
-  }
-  return state;
+      return { guilds: {}, players: {} };
+    })
+    .then((data) => {
+      state = data;
+      return state;
+    })
+    .finally(() => { loading = null; });
+  return loading;
 }
 
 function save() {
@@ -61,7 +69,7 @@ export async function trackPlayer(config, guildId, player, { pinned = false } = 
   const data = await load();
   const list = data.guilds[guildId] ?? [];
   const existing = data.players[player.id];
-  if (list.includes(player.id)) {
+  if (list.includes(player.id) && existing) {
     existing.lastViewedAt = new Date().toISOString();
     const wasPinned = existing.pinned;
     if (pinned) existing.pinned = true;
@@ -78,7 +86,7 @@ export async function trackPlayer(config, guildId, player, { pinned = false } = 
     data.players[player.id] = { name: player.name, startedAt: new Date().toISOString(), last: await fetchSnapshot(config, player.id), events: [] };
   }
   Object.assign(data.players[player.id], { lastViewedAt: new Date().toISOString(), ...(pinned && { pinned: true }) });
-  data.guilds[guildId] = [...(data.guilds[guildId] ?? []), player.id];
+  data.guilds[guildId] = [...new Set([...(data.guilds[guildId] ?? []), player.id])];
   await save();
   return { added: true };
 }
@@ -139,8 +147,7 @@ function dropExpired(data) {
   }
 }
 
-// Checks every tracked player once. Errors for one player don't stop the others.
-export async function pollTrackedPlayers(config) {
+async function pollOnce(config) {
   const data = await load();
   dropExpired(data);
   let newEvents = 0;
@@ -153,4 +160,12 @@ export async function pollTrackedPlayers(config) {
   }
   await save();
   return newEvents;
+}
+
+// Checks every tracked player once. Errors for one player don't stop the others.
+// A poll that is still running is reused instead of starting a second one: two overlapping polls
+// would diff the same previous snapshot and record every match twice.
+export function pollTrackedPlayers(config) {
+  polling ??= pollOnce(config).finally(() => { polling = null; });
+  return polling;
 }
