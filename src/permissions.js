@@ -15,11 +15,12 @@ export async function canManageTracking(interaction) {
 
 const cooldowns = new Map();
 
-// Per-user cooldown for commands that call the API a lot. Admins are exempt.
+// Per-user cooldown for commands that call the API a lot. Admins are exempt. Buttons pass the name of
+// the command whose cooldown they share, since they have no command name of their own.
 // Returns the time left in ms, or 0 when the command may run (and starts the cooldown).
-export function cooldownLeft(interaction, seconds, now = Date.now()) {
+export function cooldownLeft(interaction, seconds, name = interaction.commandName, now = Date.now()) {
   if (!seconds || isAdmin(interaction)) return 0;
-  const key = `${interaction.commandName}:${interaction.user.id}`;
+  const key = `${name}:${interaction.user.id}`;
   const until = cooldowns.get(key) ?? 0;
   if (until > now) return until - now;
   cooldowns.set(key, now + seconds * 1000);

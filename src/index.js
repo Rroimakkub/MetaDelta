@@ -141,15 +141,36 @@ client.once(Events.ClientReady, async (readyClient) => {
 
 client.on(Events.GuildCreate, (guild) => registerCommands(guild));
 
+// Toggling a card's buttons redraws the same report, so each report is kept briefly and switching back to
+// the overview costs no API calls.
+const REPORT_TTL_MS = 2 * 60 * 1000;
+const reports = new Map();
+
+function cacheReport(seasonKey, report, now = Date.now()) {
+  for (const [key, entry] of reports) if (now - entry.at > REPORT_TTL_MS) reports.delete(key);
+  reports.set(`${report.player.id}|${seasonKey}`, { report, at: now });
+}
+
+function cachedReport(playerId, seasonKey) {
+  const entry = reports.get(`${playerId}|${seasonKey}`);
+  return entry && Date.now() - entry.at <= REPORT_TTL_MS ? entry.report : null;
+}
+
 // Builds either view of a /player card with its toggle buttons. seasonKey is a season id, LIFETIME or 'current'.
 async function playerView(playerId, seasonKey, view) {
   let message;
   if (view === 'matches') {
     await touchPlayer(playerId);
-    const player = await findPlayer(config, playerId);
-    message = makeMatchesMessage(player.name, await getTracking(playerId), { intervalMinutes: config.trackIntervalMinutes });
+    const tracking = await getTracking(playerId);
+    const name = tracking?.name ?? cachedReport(playerId, seasonKey)?.player.name ?? (await findPlayer(config, playerId)).name;
+    message = makeMatchesMessage(name, tracking, { intervalMinutes: config.trackIntervalMinutes });
   } else {
-    message = await makePlayerMessage(await fetchPlayerReport(config, playerId, { seasonId: seasonKey === 'current' ? undefined : seasonKey }));
+    let report = cachedReport(playerId, seasonKey);
+    if (!report) {
+      report = await fetchPlayerReport(config, playerId, { seasonId: seasonKey === 'current' ? undefined : seasonKey });
+      cacheReport(seasonKey, report);
+    }
+    message = await makePlayerMessage(report);
   }
   return { ...message, components: [playerButtons(playerId, seasonKey, view)] };
 }
@@ -208,13 +229,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
   if (interaction.isButton() && interaction.customId.startsWith('player|')) {
     const [, view, playerId, seasonKey] = interaction.customId.split('|');
-    await interaction.deferUpdate();
+    // An overview that isn't cached calls the API as much as /player does, so it shares /player's cooldown.
+    if (view === 'overview' && !cachedReport(playerId, seasonKey)) {
+      const wait = cooldownLeft(interaction, config.commandCooldownSeconds, 'player');
+      if (wait) return interaction.reply(cooldownReply(wait));
+    }
     try {
+      await interaction.deferUpdate();
       // attachments: [] drops the previous view's chart before the new files are added.
       return await interaction.editReply({ files: [], attachments: [], ...(await playerView(playerId, seasonKey, view)) });
     } catch (error) {
       console.error(error);
-      return interaction.followUp({ content: 'ดึงข้อมูลผู้เล่นไม่สำเร็จ ลองใหม่อีกครั้งภายหลัง', flags: MessageFlags.Ephemeral });
+      return interaction.followUp({ content: 'ดึงข้อมูลผู้เล่นไม่สำเร็จ ลองใหม่อีกครั้งภายหลัง', flags: MessageFlags.Ephemeral })
+        .catch((replyError) => console.error('Could not send the error reply:', replyError.message));
     }
   }
   if (!interaction.isChatInputCommand() || !interaction.guildId) return;
@@ -298,6 +325,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.deferReply(redirect ? { flags: MessageFlags.Ephemeral } : {});
       try {
         const report = await fetchPlayerReport(config, query, { seasonId: seasonKey === 'current' ? undefined : seasonKey });
+        cacheReport(seasonKey, report);
         // Every looked-up player is tracked automatically so the Recent matches tab fills up without /track add.
         trackPlayer(config, interaction.guildId, report.player).catch((error) => console.warn(`Could not auto-track ${report.player.name}:`, error.message));
         const message = { ...(await makePlayerMessage(report)), components: [playerButtons(report.player.id, seasonKey, 'overview')] };
@@ -355,9 +383,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const response = [50001, 50013].includes(error.code)
       ? 'บอตไม่มีสิทธิ์โพสต์ในห้องที่ตั้งไว้ ดูว่าขาดสิทธิ์อะไรได้ที่ /botstatus แล้วเพิ่มสิทธิ์ให้ role ของบอตในตั้งค่าห้อง → Permissions'
       : 'โพสต์ไม่สำเร็จ กรุณาตรวจสอบ API endpoint, API token และสิทธิ์ของบอตในห้องนั้น';
-    if (interaction.deferred || interaction.replied) await interaction.editReply(response);
-    else await interaction.reply({ content: response, flags: MessageFlags.Ephemeral });
+    // The interaction itself may be what failed (e.g. answered after Discord's 3-second limit), so this reply can fail too.
+    const reply = interaction.deferred || interaction.replied
+      ? interaction.editReply(response)
+      : interaction.reply({ content: response, flags: MessageFlags.Ephemeral });
+    await reply.catch((replyError) => console.error('Could not send the error reply:', replyError.message));
   }
 });
 
-client.login(config.botToken);
+// discord.js turns a rejected event handler into an 'error' event, and an 'error' event with no listener
+// crashes the process. Log these instead so one failed reply doesn't restart the bot.
+client.on(Events.Error, (error) => console.error('Discord client error:', error));
+process.on('unhandledRejection', (error) => console.error('Unhandled rejection:', error));
+
+// A failed login (e.g. no network yet after boot) exits so pm2 restarts the bot and tries again.
+client.login(config.botToken).catch((error) => {
+  console.error('Login failed:', error.message);
+  process.exit(1);
+});
