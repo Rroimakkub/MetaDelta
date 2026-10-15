@@ -1,4 +1,4 @@
-import { Client, Events, GatewayIntentBits, MessageFlags } from 'discord.js';
+import { Client, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { commands } from './commands.js';
 import { getConfig } from './config.js';
 import { craftKey, getCachedCraftRecommendations, loadRecipes } from './crafting.js';
@@ -99,7 +99,7 @@ async function announceMatches(newEvents) {
       if (!channelId) continue;
       try {
         const channel = await client.channels.fetch(channelId);
-        if (channel?.isTextBased()) await channel.send(makeMatchNotification(name, event));
+        if (channel?.isTextBased()) await channel.send(makeMatchNotification(name, event, { intervalMinutes: config.trackIntervalMinutes }));
       } catch (error) {
         console.warn(`Could not announce a match for ${name} in guild ${guildId}:`, error.message);
       }
@@ -152,6 +152,15 @@ async function playerView(playerId, seasonKey, view) {
     message = await makePlayerMessage(await fetchPlayerReport(config, playerId, { seasonId: seasonKey === 'current' ? undefined : seasonKey }));
   }
   return { ...message, components: [playerButtons(playerId, seasonKey, view)] };
+}
+
+// Permissions the bot needs to post its cards (embeds with attached images) in a channel.
+const POST_PERMISSIONS = ['ViewChannel', 'SendMessages', 'EmbedLinks', 'AttachFiles'];
+
+// Private channels and category overrides can hide a channel from the bot even when its role allows posting.
+function missingPostPermissions(guild, channelId) {
+  const permissions = guild?.channels.cache.get(channelId)?.permissionsFor(guild.members.me);
+  return permissions ? POST_PERMISSIONS.filter((flag) => !permissions.has(PermissionFlagsBits[flag])) : [];
 }
 
 async function suggestTracked(interaction) {
@@ -215,8 +224,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const kind = interaction.options.getString('type') ?? 'market';
       if (!channel.isTextBased()) return interaction.reply({ content: 'กรุณาเลือกห้องข้อความ', flags: MessageFlags.Ephemeral });
       await setChannel(interaction.guildId, channel.id, kind);
-      const what = kind === 'stats' ? 'ห้องสถิติผู้เล่น (ผลของ /player จะส่งมาที่นี่)' : 'ห้องตลาด (คำแนะนำคราฟรายวันและ /postnow)';
-      return interaction.reply({ content: `ตั้ง ${channel} เป็น${what}แล้ว`, flags: MessageFlags.Ephemeral });
+      const what = kind === 'stats' ? 'ห้องสถิติผู้เล่น (ผลของ /player จะส่งมาที่นี่)' : 'ห้องตลาด (คำแนะนำคราฟรายวันและ /craftpost)';
+      const missing = missingPostPermissions(interaction.guild, channel.id);
+      const warning = missing.length
+        ? `\n⚠️ แต่บอตยังโพสต์ในห้องนี้ไม่ได้ ขาดสิทธิ์: **${missing.join(', ')}**\nแก้ที่ ตั้งค่าห้อง → Permissions → เพิ่ม role **${interaction.guild.members.me.roles.botRole?.name ?? interaction.client.user.username}** แล้วอนุญาตสิทธิ์ข้างบน`
+        : '';
+      return interaction.reply({ content: `ตั้ง ${channel} เป็น${what}แล้ว${warning}`, flags: MessageFlags.Ephemeral });
     }
     if (interaction.commandName === 'trackrole') {
       const role = interaction.options.getRole('role');
@@ -231,10 +244,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const [market, stats, trackerRole] = await Promise.all([
         getChannel(interaction.guildId, 'market'), getChannel(interaction.guildId, 'stats'), getGuildSetting(interaction.guildId, 'trackerRole'),
       ]);
+      const channelStatus = (channelId) => {
+        const missing = missingPostPermissions(interaction.guild, channelId);
+        return `<#${channelId}>${missing.length ? `  ⚠️ บอตขาดสิทธิ์ ${missing.join(', ')} ในห้องนี้` : ''}`;
+      };
       return interaction.reply({
         content: [
-          `ห้องตลาด: ${market ? `<#${market}>` : 'ยังไม่ได้ตั้ง (ใช้ /setchannel type:ตลาด)'}`,
-          `ห้องสถิติ: ${stats ? `<#${stats}>` : 'ยังไม่ได้ตั้ง (ผล /player จะขึ้นในห้องที่พิมพ์)'}`,
+          `ห้องตลาด: ${market ? channelStatus(market) : 'ยังไม่ได้ตั้ง (ใช้ /setchannel type:ตลาด)'}`,
+          `ห้องสถิติ: ${stats ? channelStatus(stats) : 'ยังไม่ได้ตั้ง (ผล /player จะขึ้นในห้องที่พิมพ์)'}`,
           `ใช้ /track add, remove ได้: แอดมิน${trackerRole ? ` และ <@&${trackerRole}>` : ' เท่านั้น (ตั้ง role ด้วย /trackrole)'}`,
           `Cooldown ของ /player และ /craft: ${config.commandCooldownSeconds ? `${config.commandCooldownSeconds} วินาทีต่อคน (แอดมินไม่ติด)` : 'ปิด'}`,
           `เวลาโพสต์: ${config.postTime} (${config.timeZone})`,
@@ -243,7 +260,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         flags: MessageFlags.Ephemeral,
       });
     }
-    if (interaction.commandName === 'postnow') {
+    if (interaction.commandName === 'craftpost') {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const channelId = await getChannel(interaction.guildId);
       if (!channelId) return interaction.editReply('ยังไม่ได้ตั้งห้อง ใช้ /setchannel ก่อน');
@@ -292,6 +309,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       } catch (error) {
         if (error instanceof PlayerNotFoundError) return interaction.editReply(`ไม่พบผู้เล่นชื่อ **${query}** ลองเช็กตัวสะกด หรือใช้ Delta Force ID แทน`);
         console.error(error);
+        if ([50001, 50013].includes(error.code)) return interaction.editReply(`บอตไม่มีสิทธิ์โพสต์ใน <#${statsChannelId}> ให้แอดมินเพิ่มสิทธิ์ให้ role ของบอตในห้องนั้น (ดูได้ที่ /botstatus)`);
         return interaction.editReply('ดึงข้อมูลผู้เล่นไม่สำเร็จ ลองใหม่อีกครั้งภายหลัง');
       }
     }
@@ -333,7 +351,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   } catch (error) {
     console.error(error);
-    const response = 'โพสต์ไม่สำเร็จ กรุณาตรวจสอบ API endpoint, API token และสิทธิ์ของบอตในห้องนั้น';
+    // 50001 Missing Access / 50013 Missing Permissions: the bot can't see or post in the configured channel.
+    const response = [50001, 50013].includes(error.code)
+      ? 'บอตไม่มีสิทธิ์โพสต์ในห้องที่ตั้งไว้ ดูว่าขาดสิทธิ์อะไรได้ที่ /botstatus แล้วเพิ่มสิทธิ์ให้ role ของบอตในตั้งค่าห้อง → Permissions'
+      : 'โพสต์ไม่สำเร็จ กรุณาตรวจสอบ API endpoint, API token และสิทธิ์ของบอตในห้องนั้น';
     if (interaction.deferred || interaction.replied) await interaction.editReply(response);
     else await interaction.reply({ content: response, flags: MessageFlags.Ephemeral });
   }
