@@ -27,9 +27,12 @@ function formatHours(minutes) {
 }
 
 async function drawCell(cell, left, top, height, icons) {
+  // Long workshop names shrink to stay clear of the materials column (a bold capital is about 0.62em wide).
+  const title = cell.workshop.toUpperCase();
+  const titleSize = Math.min(34, Math.floor((INFO_WIDTH - PAD - 16) / (title.length * 0.62)));
   const shapes = [
     `<rect x="${left}" y="${top}" width="${CELL_WIDTH}" height="${height}" rx="18" fill="#2b2d31"/>`,
-    text(left + PAD, top + 50, 34, '#f1c40f', cell.workshop.toUpperCase(), 'font-weight="bold" letter-spacing="1"'),
+    text(left + PAD, top + 50, titleSize, '#f1c40f', title, 'font-weight="bold" letter-spacing="1"'),
   ];
 
   const { craft } = cell;
@@ -50,11 +53,14 @@ async function drawCell(cell, left, top, height, icons) {
   if (itemIcon) icons.push({ input: itemIcon, left: iconX + 4, top: iconY + 4 });
   const details = [craft.tier && `T${craft.tier}`, craft.quantity > 1 && `×${formatNumber(craft.quantity)}`, formatHours(craft.minutes)].filter(Boolean).join(' · ');
   const textX = iconX + ITEM_ICON + 24;
+  // Long item names get a smaller font (down to 30px) before they are cut short.
+  const nameWidth = INFO_WIDTH - PAD - 16;
+  const nameSize = Math.max(30, Math.min(40, Math.floor(nameWidth / (craft.item.length * 0.56))));
   shapes.push(
     text(textX, iconY + 44, 30, '#b5bac1', details),
     text(textX, iconY + 104, 50, '#57f287', formatNumber(profitPerHour), 'font-weight="bold"'),
     text(textX, iconY + 140, 28, '#57f287', 'ต่อชั่วโมง'),
-    text(left + PAD, top + 268, 40, '#ffffff', truncate(craft.item, 20), 'font-weight="bold"'),
+    text(left + PAD, top + 268, nameSize, '#ffffff', truncate(craft.item, Math.floor(nameWidth / (nameSize * 0.56))), 'font-weight="bold"'),
     text(left + PAD, top + 312, 30, '#dbdee1', `กำไร ${formatNumber(profit)}${roi == null ? '' : ` · ROI ${roi}%`}`),
   );
 

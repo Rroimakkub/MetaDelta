@@ -2,7 +2,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'disc
 import { formatCompact, makeLineChart } from './charts.js';
 import { callApi } from './deltaforce.js';
 
-const HISTORY_DAYS = 30;
+const HISTORY_DAYS = 7;
 const RECENT_MATCHES = 5;
 const MAX_HISTORY_PAGES = 5;
 const SEASON_TTL = 6 * 60 * 60 * 1000;
@@ -228,25 +228,35 @@ function eventResult(event) {
   return `🎮 ${event.matchesPlayed} แมตช์${parts.length ? ` (${parts.join(' ')})` : ''}`;
 }
 
-function eventExtras(event) {
-  const extras = [`ฆ่า ${formatNumber(event.totalKills)}`, `ตาย ${formatNumber(event.totalDeaths)}`, `ขนออก ${formatCompact(event.extractedAssets)}`];
-  if (event.extractedMandlebricks > 0) extras.push(`Mandelbrick ${event.extractedMandlebricks}`);
-  return extras.join('  •  ');
+// An event is stamped with when the bot noticed it. When it merges several matches, or the bot was off for a while,
+// that says little about when they were played, so show the window between the two checks instead.
+function eventWindow(event, intervalMinutes) {
+  if (!event.from) return null;
+  const from = toUnix(event.from);
+  const to = toUnix(event.at);
+  if (event.matchesPlayed <= 1 && to - from <= intervalMinutes * 60 * 1.5) return null;
+  return to - from > 24 * 60 * 60 ? `เล่นช่วง <t:${from}:f> – <t:${to}:f>` : `เล่นช่วง <t:${from}:t>–<t:${to}:t>`;
 }
 
-function describeEvent(event) {
-  return `<t:${toUnix(event.at)}:R>  ${eventResult(event)}\n└ ${eventExtras(event)}`;
+function eventExtras(event, intervalMinutes) {
+  const extras = [eventWindow(event, intervalMinutes), `ฆ่า ${formatNumber(event.totalKills)}`, `ตาย ${formatNumber(event.totalDeaths)}`, `ขนออก ${formatCompact(event.extractedAssets)}`];
+  if (event.extractedMandlebricks > 0) extras.push(`Mandelbrick ${event.extractedMandlebricks}`);
+  return extras.filter(Boolean).join('  •  ');
+}
+
+function describeEvent(event, intervalMinutes) {
+  return `<t:${toUnix(event.at)}:R>  ${eventResult(event)}\n└ ${eventExtras(event, intervalMinutes)}`;
 }
 
 // Posted in the stats channel when a tracked player finishes a match.
-export function makeMatchNotification(playerName, event) {
+export function makeMatchNotification(playerName, event, { intervalMinutes }) {
   const extracted = event.matchesExtracted > 0 && event.matchesExtracted >= event.matchesLost;
   return {
     embeds: [new EmbedBuilder()
       .setColor(extracted ? 0x57f287 : 0xed4245)
       .setAuthor({ name: 'Delta Force — Operations  •  แมตช์ใหม่' })
       .setTitle(playerName)
-      .setDescription(`${eventResult(event)}\n${eventExtras(event)}`)
+      .setDescription(`${eventResult(event)}\n${eventExtras(event, intervalMinutes)}`)
       .setFooter({ text: event.matchesPlayed > 1 ? 'รวมหลายแมตช์ที่เล่นระหว่างการเช็กรอบก่อน' : 'ดูทั้งหมดได้ที่ปุ่ม 📜 แมตช์ล่าสุด ของ /player' })
       .setTimestamp(new Date(event.at))],
   };
@@ -272,7 +282,7 @@ export function makeMatchesMessage(playerName, tracking, { intervalMinutes }) {
     embed.setDescription([
       `**${events.length} รายการล่าสุด:** ${formatNumber(matches)} แมตช์  •  ถอนตัว ${formatPercent(total('matchesExtracted') / matches)}  •  ฆ่า ${formatNumber(total('totalKills'))}  •  ขนออก ${formatCompact(total('extractedAssets'))}`,
       '',
-      ...events.map(describeEvent),
+      ...events.map((event) => describeEvent(event, intervalMinutes)),
     ].join('\n').slice(0, 4_000));
   }
   embed.setFooter({ text: `ติดตามตั้งแต่ ${new Date(tracking.startedAt).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })}  •  เช็กทุก ${intervalMinutes} นาที  •  1 แถวอาจรวมหลายแมตช์ที่เล่นระหว่างการเช็ก` });

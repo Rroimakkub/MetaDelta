@@ -19,8 +19,8 @@ export const commands = [
     .addRoleOption((option) => option.setName('role').setDescription('role ที่อนุญาต'))
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   new SlashCommandBuilder()
-    .setName('postnow')
-    .setDescription('โพสต์ข้อมูล Delta Force ทันที')
+    .setName('craftpost')
+    .setDescription('โพสต์คำแนะนำคราฟไปที่ห้องตลาดทันที')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   new SlashCommandBuilder().setName('botstatus').setDescription('ดูการตั้งค่าของบอต'),
   new SlashCommandBuilder()
