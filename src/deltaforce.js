@@ -39,7 +39,12 @@ export async function fetchMarketPrice(config, item) {
     };
   }
   const data = await callApi(config, 'GetItemAuctionPrice', { itemId: item.id });
-  if (data.price?.price == null) throw new Error(`No market price for ${item.name}.`);
+  if (data.price?.price == null) {
+    // Same status the API uses for an item with no price, so callers can tell "no price" from a failed request.
+    const error = new Error(`No market price for ${item.name}.`);
+    error.status = 404;
+    throw error;
+  }
   return { ...data.price, item };
 }
 
@@ -55,15 +60,29 @@ export async function listAllItems(config) {
 }
 
 const CATALOG_TTL = 6 * 60 * 60 * 1000;
+const CATALOG_RETRY_MS = 60 * 1000;
 let catalog = null;
+let latestItems = [];
+let catalogFailedAt = 0;
 
-function getCatalog(config) {
+// All items (about 3,800). Loading takes ~13 seconds, so the list is cached for 6 hours.
+export function getCatalog(config) {
   if (!catalog || Date.now() - catalog.loadedAt > CATALOG_TTL) {
     const items = listAllItems(config);
     catalog = { items, loadedAt: Date.now() };
-    items.catch(() => { catalog = null; });
+    items.then((list) => { latestItems = list; }, () => {
+      if (catalog?.items === items) catalog = null;
+      catalogFailedAt = Date.now();
+    });
   }
   return catalog.items;
+}
+
+// The catalog as last loaded, without waiting: autocomplete must answer within Discord's 3 seconds.
+// Starts a refresh in the background when the cache is stale, but not on every keystroke after a failed load.
+export function catalogSnapshot(config) {
+  if (Date.now() - catalogFailedAt > CATALOG_RETRY_MS) getCatalog(config).catch(() => {});
+  return latestItems;
 }
 
 export function normalizeName(name) {

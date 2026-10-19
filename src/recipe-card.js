@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { FONT, formatNumber } from './charts.js';
 
 // Renders a craft's materials as one PNG: a row per material with its icon, name, quantity and price.
 // Discord embeds take only one large image, so the material icons are drawn into a single card.
@@ -8,13 +9,11 @@ const TOP = 12;
 const FOOTER = 66;
 const ICON = 84;
 const TEXT_X = 16 + ICON + 20;
-const FONT = 'Segoe UI, Leelawadee UI, Tahoma, sans-serif';
 const SOURCE_LABELS = { crafted: 'คราฟเอง', fixed: 'ราคาประเมิน' };
 
 const iconCache = new Map(); // keyed by "size|url"
 
 const escapeXml = (text) => String(text).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char]);
-const formatNumber = (value) => new Intl.NumberFormat('en-US').format(Math.round(value));
 const truncate = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
 export function loadIcon(url, size = ICON) {

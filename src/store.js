@@ -19,7 +19,7 @@ async function save(data) {
   await writeFile(file, JSON.stringify(data, null, 2), 'utf8');
 }
 
-// Per-server settings: 'market' and 'stats' channel ids, and 'trackerRole' (role allowed to use /track add/remove).
+// Per-server settings: the 'market' and 'stats' channel ids.
 // Older files stored a single channel id per server; that is treated as the market channel.
 const channelsOf = (entry) => (typeof entry === 'string' ? { market: entry } : entry ?? {});
 

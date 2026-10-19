@@ -37,16 +37,6 @@ export function getConfig() {
     throw new Error('TOP_PER_WORKSHOP must be a whole number from 1 to 10.');
   }
 
-  const trackIntervalMinutes = Number(process.env.TRACK_INTERVAL_MINUTES ?? 10);
-  if (!(Number.isInteger(trackIntervalMinutes) && trackIntervalMinutes >= 5 && trackIntervalMinutes <= 120)) {
-    throw new Error('TRACK_INTERVAL_MINUTES must be a whole number from 5 to 120.');
-  }
-
-  const matchNotify = process.env.MATCH_NOTIFY ?? 'pinned';
-  if (!['pinned', 'all', 'off'].includes(matchNotify)) {
-    throw new Error('MATCH_NOTIFY must be pinned, all or off.');
-  }
-
   const commandCooldownSeconds = Number(process.env.COMMAND_COOLDOWN_SECONDS ?? 15);
   if (!(Number.isInteger(commandCooldownSeconds) && commandCooldownSeconds >= 0 && commandCooldownSeconds <= 600)) {
     throw new Error('COMMAND_COOLDOWN_SECONDS must be a whole number from 0 to 600.');
@@ -70,8 +60,6 @@ export function getConfig() {
     postTime,
     sellTaxPercent,
     topPerWorkshop,
-    trackIntervalMinutes,
-    matchNotify,
     commandCooldownSeconds,
   };
 }
