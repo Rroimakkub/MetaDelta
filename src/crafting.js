@@ -48,7 +48,8 @@ export async function loadRecipes() {
   return { recipes, intermediates: new Map(intermediates.map((intermediate) => [refKey(intermediate), intermediate])) };
 }
 
-async function mapLimit(values, limit, fn) {
+// Runs fn over values with at most `limit` calls in flight; resolves to Promise.allSettled-style results.
+export async function mapLimit(values, limit, fn) {
   const results = new Array(values.length);
   let next = 0;
   async function worker() {

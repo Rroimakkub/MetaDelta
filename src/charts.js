@@ -3,9 +3,13 @@ import sharp from 'sharp';
 const WIDTH = 800;
 const HEIGHT = 300;
 const PAD = { top: 48, right: 24, bottom: 40, left: 84 };
-const FONT = 'Segoe UI, Leelawadee UI, Tahoma, sans-serif';
+// Font list for every image the bot draws. Segoe UI and Leelawadee UI (Thai) come with Windows; on a Linux server
+// install Noto fonts (Ubuntu: fonts-noto-core) so Thai text doesn't render as boxes.
+export const FONT = 'Segoe UI, Leelawadee UI, Noto Sans, Noto Sans Thai, Tahoma, sans-serif';
 
 const escapeXml = (text) => String(text).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char]);
+
+export const formatNumber = (value) => new Intl.NumberFormat('en-US').format(Math.round(value));
 
 export function formatCompact(value) {
   const abs = Math.abs(value);

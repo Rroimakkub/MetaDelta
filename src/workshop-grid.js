@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { FONT, formatNumber } from './charts.js';
 import { calculateCraft } from './deltaforce.js';
 import { loadIcon } from './recipe-card.js';
 
@@ -13,11 +14,9 @@ const MATERIAL_ICON = 58;
 const MATERIAL_ROW = 72;
 const MATERIALS_TOP = 70;
 const MIN_HEIGHT = 330;
-const FONT = 'Segoe UI, Leelawadee UI, Tahoma, sans-serif';
 const SOURCE_LABELS = { crafted: 'คราฟเอง', fixed: 'ประเมิน' };
 
 const escapeXml = (text) => String(text).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char]);
-const formatNumber = (value) => new Intl.NumberFormat('en-US').format(Math.round(value));
 const truncate = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 const text = (x, y, size, fill, content, extra = '') => `<text x="${x}" y="${y}" font-family="${FONT}" font-size="${size}" fill="${fill}" ${extra}>${escapeXml(content)}</text>`;
 

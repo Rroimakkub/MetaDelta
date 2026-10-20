@@ -3,31 +3,43 @@ import { commands } from './commands.js';
 import { getConfig } from './config.js';
 import { craftKey, getCachedCraftRecommendations, loadRecipes } from './crafting.js';
 import {
-  attachThumbnails, fetchMarketPrice, makeCraftDetailMessage, makeDemoWorkshopMessages, makeMarketEmbed, makeWorkshopGridMessage, makeWorkshopMessages,
+  attachThumbnails, fetchMarketPrice, getCatalog, makeCraftDetailMessage, makeDemoWorkshopMessages, makeMarketEmbed, makeWorkshopGridMessage, makeWorkshopMessages,
   normalizeName, topCrafts, workshopCells,
 } from './deltaforce.js';
+import { fetchPriceSeries, getRedBoard, makePriceMessage, makeRedBoardMessage, resolveMarketItem, suggestMarketItems } from './market.js';
 import { makeWorkshopGrid } from './workshop-grid.js';
-import {
-  fetchPlayerReport, findPlayer, LIFETIME, listSeasons, makeMatchesMessage, makeMatchNotification, makePlayerMessage, playerButtons, PlayerNotFoundError, seasonLabel,
-} from './player.js';
-import { canManageTracking, cooldownLeft, cooldownReply } from './permissions.js';
+import { fetchPlayerReport, LIFETIME, listSeasons, makePlayerMessage, PlayerNotFoundError, seasonLabel } from './player.js';
+import { cooldownLeft, cooldownReply, refundCooldown } from './permissions.js';
 import { makeMaterialsImage } from './recipe-card.js';
-import { getAllChannels, getChannel, getGuildSetting, setChannel, setGuildSetting } from './store.js';
-import { getTracking, listTracked, MAX_PLAYERS_PER_GUILD, pollTrackedPlayers, touchPlayer, trackPlayer, untrackPlayer } from './tracking.js';
+import { getAllChannels, getChannel, setChannel } from './store.js';
 
 const config = getConfig();
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-async function postToChannel(channelId) {
-  const channel = await client.channels.fetch(channelId);
-  if (!channel?.isTextBased()) throw new Error('Configured channel is unavailable or is not a text channel.');
-  const messages = config.demoMode ? makeDemoWorkshopMessages() : await makeCraftMessages();
+// The daily post: craft recommendations, the red loot board, then any MARKET_ITEMS prices. Built once and sent to
+// every market channel; thumbnails are downloaded here so the same files can be reused for each channel.
+async function makeDailyMessages() {
+  // Pricing the recipes and the red loot board don't depend on each other, so both run at once.
+  const [messages, board] = await Promise.all([
+    config.demoMode ? makeDemoWorkshopMessages() : makeCraftMessages(),
+    config.demoMode ? [] : getRedBoard(config).catch((error) => {
+      console.warn('Could not build the red loot board:', error.message);
+      return [];
+    }),
+  ]);
+  if (board.length) messages.push(makeRedBoardMessage(board));
   if (!config.demoMode && config.marketItems.length) {
     const results = await Promise.allSettled(config.marketItems.map((item) => fetchMarketPrice(config, item)));
     const prices = results.filter(({ status }) => status === 'fulfilled').map(({ value }) => value);
     if (prices.length) messages.push({ embeds: [makeMarketEmbed(prices)] });
   }
-  for (const message of messages) await channel.send(await attachThumbnails(message));
+  return Promise.all(messages.map(attachThumbnails));
+}
+
+async function postToChannel(channelId, messages) {
+  const channel = await client.channels.fetch(channelId);
+  if (!channel?.isTextBased()) throw new Error('Configured channel is unavailable or is not a text channel.');
+  for (const message of messages) await channel.send(message);
 }
 
 async function makeCraftMessages() {
@@ -55,9 +67,12 @@ async function makeCraftMessages() {
 }
 
 async function postToAllConfiguredChannels() {
-  for (const { guildId, channelId } of await getAllChannels('market')) {
+  const channels = await getAllChannels('market');
+  if (!channels.length) return;
+  const messages = await makeDailyMessages();
+  for (const { guildId, channelId } of channels) {
     try {
-      await postToChannel(channelId);
+      await postToChannel(channelId, messages);
     } catch (error) {
       console.error(`Could not post to guild ${guildId}:`, error.message);
     }
@@ -87,40 +102,6 @@ function scheduleDailyPost() {
   setInterval(() => checkSchedule().catch((error) => console.error('Schedule check failed:', error.message)), 30_000);
 }
 
-// Posts each new match in the stats channel of every server tracking that player.
-// MATCH_NOTIFY=pinned (default) only announces players added with /track add, so players who were
-// merely looked up with /player don't fill the channel.
-async function announceMatches(newEvents) {
-  if (config.matchNotify === 'off') return;
-  for (const { name, pinned, guildIds, event } of newEvents) {
-    if (config.matchNotify === 'pinned' && !pinned) continue;
-    for (const guildId of guildIds) {
-      const channelId = await getChannel(guildId, 'stats');
-      if (!channelId) continue;
-      try {
-        const channel = await client.channels.fetch(channelId);
-        if (channel?.isTextBased()) await channel.send(makeMatchNotification(name, event, { intervalMinutes: config.trackIntervalMinutes }));
-      } catch (error) {
-        console.warn(`Could not announce a match for ${name} in guild ${guildId}:`, error.message);
-      }
-    }
-  }
-}
-
-function scheduleTracking() {
-  if (config.demoMode) return;
-  const run = () => pollTrackedPlayers(config)
-    .then(async (newEvents) => {
-      if (!newEvents.length) return;
-      console.log(`Tracking: recorded ${newEvents.length} new match event(s).`);
-      await announceMatches(newEvents);
-    })
-    .catch((error) => console.error('Tracking poll failed:', error.message));
-  console.log(`Tracking players every ${config.trackIntervalMinutes} minutes.`);
-  run();
-  setInterval(run, config.trackIntervalMinutes * 60_000);
-}
-
 // Keeps each server's slash commands in sync with src/commands.js, so moving or inviting the bot
 // needs no manual `npm run register`.
 async function registerCommands(guild) {
@@ -136,44 +117,11 @@ client.once(Events.ClientReady, async (readyClient) => {
   console.log(`Logged in as ${readyClient.user.tag}.`);
   for (const guild of readyClient.guilds.cache.values()) await registerCommands(guild);
   scheduleDailyPost();
-  scheduleTracking();
+  // Load the item list now so /price autocomplete has names to suggest from the first keystroke.
+  if (!config.demoMode) getCatalog(config).catch((error) => console.warn('Could not load the item list:', error.message));
 });
 
 client.on(Events.GuildCreate, (guild) => registerCommands(guild));
-
-// Toggling a card's buttons redraws the same report, so each report is kept briefly and switching back to
-// the overview costs no API calls.
-const REPORT_TTL_MS = 2 * 60 * 1000;
-const reports = new Map();
-
-function cacheReport(seasonKey, report, now = Date.now()) {
-  for (const [key, entry] of reports) if (now - entry.at > REPORT_TTL_MS) reports.delete(key);
-  reports.set(`${report.player.id}|${seasonKey}`, { report, at: now });
-}
-
-function cachedReport(playerId, seasonKey) {
-  const entry = reports.get(`${playerId}|${seasonKey}`);
-  return entry && Date.now() - entry.at <= REPORT_TTL_MS ? entry.report : null;
-}
-
-// Builds either view of a /player card with its toggle buttons. seasonKey is a season id, LIFETIME or 'current'.
-async function playerView(playerId, seasonKey, view) {
-  let message;
-  if (view === 'matches') {
-    await touchPlayer(playerId);
-    const tracking = await getTracking(playerId);
-    const name = tracking?.name ?? cachedReport(playerId, seasonKey)?.player.name ?? (await findPlayer(config, playerId)).name;
-    message = makeMatchesMessage(name, tracking, { intervalMinutes: config.trackIntervalMinutes });
-  } else {
-    let report = cachedReport(playerId, seasonKey);
-    if (!report) {
-      report = await fetchPlayerReport(config, playerId, { seasonId: seasonKey === 'current' ? undefined : seasonKey });
-      cacheReport(seasonKey, report);
-    }
-    message = await makePlayerMessage(report);
-  }
-  return { ...message, components: [playerButtons(playerId, seasonKey, view)] };
-}
 
 // Permissions the bot needs to post its cards (embeds with attached images) in a channel.
 const POST_PERMISSIONS = ['ViewChannel', 'SendMessages', 'EmbedLinks', 'AttachFiles'];
@@ -182,15 +130,6 @@ const POST_PERMISSIONS = ['ViewChannel', 'SendMessages', 'EmbedLinks', 'AttachFi
 function missingPostPermissions(guild, channelId) {
   const permissions = guild?.channels.cache.get(channelId)?.permissionsFor(guild.members.me);
   return permissions ? POST_PERMISSIONS.filter((flag) => !permissions.has(PermissionFlagsBits[flag])) : [];
-}
-
-async function suggestTracked(interaction) {
-  const typed = interaction.options.getFocused().toLocaleLowerCase();
-  const players = await listTracked(interaction.guildId);
-  await interaction.respond(players
-    .filter((player) => player.name.toLocaleLowerCase().includes(typed))
-    .slice(0, 25)
-    .map((player) => ({ name: player.name, value: player.name })));
 }
 
 // Recipe names come straight from data/recipes.json so autocomplete answers within Discord's 3-second limit.
@@ -212,6 +151,10 @@ function findCraft(groups, query) {
   return all.find((craft) => normalizeName(craft.item) === typed) ?? all.find((craft) => normalizeName(craft.item).includes(typed)) ?? null;
 }
 
+async function suggestPrices(interaction) {
+  await interaction.respond(suggestMarketItems(config, interaction.options.getFocused()));
+}
+
 async function suggestSeasons(interaction) {
   const typed = interaction.options.getFocused().toLocaleLowerCase();
   const seasons = config.demoMode ? [] : await listSeasons(config).catch(() => []);
@@ -224,25 +167,12 @@ async function suggestSeasons(interaction) {
 
 client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isAutocomplete()) {
-    const suggest = { player: suggestSeasons, track: suggestTracked, craft: suggestCrafts }[interaction.commandName];
+    const suggest ={ player: suggestSeasons, craft: suggestCrafts, price: suggestPrices }[interaction.commandName];
     return suggest?.(interaction).catch((error) => console.error('Autocomplete failed:', error.message));
   }
+  // Older /player cards still carry the removed Overview / Recent matches buttons; clicking one just removes them.
   if (interaction.isButton() && interaction.customId.startsWith('player|')) {
-    const [, view, playerId, seasonKey] = interaction.customId.split('|');
-    // An overview that isn't cached calls the API as much as /player does, so it shares /player's cooldown.
-    if (view === 'overview' && !cachedReport(playerId, seasonKey)) {
-      const wait = cooldownLeft(interaction, config.commandCooldownSeconds, 'player');
-      if (wait) return interaction.reply(cooldownReply(wait));
-    }
-    try {
-      await interaction.deferUpdate();
-      // attachments: [] drops the previous view's chart before the new files are added.
-      return await interaction.editReply({ files: [], attachments: [], ...(await playerView(playerId, seasonKey, view)) });
-    } catch (error) {
-      console.error(error);
-      return interaction.followUp({ content: 'ดึงข้อมูลผู้เล่นไม่สำเร็จ ลองใหม่อีกครั้งภายหลัง', flags: MessageFlags.Ephemeral })
-        .catch((replyError) => console.error('Could not send the error reply:', replyError.message));
-    }
+    return interaction.update({ components: [] });
   }
   if (!interaction.isChatInputCommand() || !interaction.guildId) return;
   try {
@@ -258,19 +188,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         : '';
       return interaction.reply({ content: `ตั้ง ${channel} เป็น${what}แล้ว${warning}`, flags: MessageFlags.Ephemeral });
     }
-    if (interaction.commandName === 'trackrole') {
-      const role = interaction.options.getRole('role');
-      await setGuildSetting(interaction.guildId, 'trackerRole', role?.id ?? null);
-      return interaction.reply({
-        content: role ? `สมาชิกที่มี ${role} ใช้ /track add และ /track remove ได้แล้ว (แอดมินใช้ได้เสมอ)` : 'ล้าง role แล้ว ตอนนี้ /track add และ /track remove ใช้ได้เฉพาะแอดมิน',
-        allowedMentions: { parse: [] },
-        flags: MessageFlags.Ephemeral,
-      });
-    }
     if (interaction.commandName === 'botstatus') {
-      const [market, stats, trackerRole] = await Promise.all([
-        getChannel(interaction.guildId, 'market'), getChannel(interaction.guildId, 'stats'), getGuildSetting(interaction.guildId, 'trackerRole'),
-      ]);
+      const [market, stats] = await Promise.all([getChannel(interaction.guildId, 'market'), getChannel(interaction.guildId, 'stats')]);
       const channelStatus = (channelId) => {
         const missing = missingPostPermissions(interaction.guild, channelId);
         return `<#${channelId}>${missing.length ? `  ⚠️ บอตขาดสิทธิ์ ${missing.join(', ')} ในห้องนี้` : ''}`;
@@ -279,8 +198,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         content: [
           `ห้องตลาด: ${market ? channelStatus(market) : 'ยังไม่ได้ตั้ง (ใช้ /setchannel type:ตลาด)'}`,
           `ห้องสถิติ: ${stats ? channelStatus(stats) : 'ยังไม่ได้ตั้ง (ผล /player จะขึ้นในห้องที่พิมพ์)'}`,
-          `ใช้ /track add, remove ได้: แอดมิน${trackerRole ? ` และ <@&${trackerRole}>` : ' เท่านั้น (ตั้ง role ด้วย /trackrole)'}`,
-          `Cooldown ของ /player และ /craft: ${config.commandCooldownSeconds ? `${config.commandCooldownSeconds} วินาทีต่อคน (แอดมินไม่ติด)` : 'ปิด'}`,
+          `Cooldown ของ /player, /craft และ /price: ${config.commandCooldownSeconds ? `${config.commandCooldownSeconds} วินาทีต่อคน (แอดมินไม่ติด)` : 'ปิด'}`,
           `เวลาโพสต์: ${config.postTime} (${config.timeZone})`,
         ].join('\n'),
         allowedMentions: { parse: [] },
@@ -291,7 +209,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const channelId = await getChannel(interaction.guildId);
       if (!channelId) return interaction.editReply('ยังไม่ได้ตั้งห้อง ใช้ /setchannel ก่อน');
-      await postToChannel(channelId);
+      // Check access first: building the post takes ~300 API calls.
+      const missing = missingPostPermissions(interaction.guild, channelId);
+      if (missing.length) return interaction.editReply(`บอตโพสต์ใน <#${channelId}> ไม่ได้ ขาดสิทธิ์: **${missing.join(', ')}** (ดูวิธีแก้ที่ /botstatus)`);
+      await postToChannel(channelId, await makeDailyMessages());
       return interaction.editReply(`โพสต์ราคาตลาดไปที่ <#${channelId}> แล้ว`);
     }
     if (interaction.commandName === 'craft') {
@@ -313,6 +234,33 @@ client.on(Events.InteractionCreate, async (interaction) => {
       });
       return interaction.editReply(await attachThumbnails(message));
     }
+    if (interaction.commandName === 'price') {
+      if (config.demoMode) return interaction.reply({ content: 'คำสั่งนี้ต้องใช้ข้อมูลจริงจาก API ตั้ง DEMO_MODE=false ก่อน', flags: MessageFlags.Ephemeral });
+      const query = interaction.options.getString('item', true).trim();
+      const wait = cooldownLeft(interaction, config.commandCooldownSeconds);
+      if (wait) return interaction.reply(cooldownReply(wait));
+      await interaction.deferReply();
+      const item = await resolveMarketItem(config, query);
+      if (!item) {
+        refundCooldown(interaction);
+        return interaction.editReply('ไม่พบไอเทมนี้ในตลาด เลือกชื่อจากรายการที่ขึ้นตอนพิมพ์ (ชื่อภาษาอังกฤษ)');
+      }
+      const [price, series] = await Promise.allSettled([
+        fetchMarketPrice(config, { id: item.id, name: item.name }),
+        fetchPriceSeries(config, item.id),
+      ]);
+      if (series.status === 'rejected') console.warn(`Could not load the price history of ${item.name}:`, series.reason.message);
+      if (price.status === 'rejected') {
+        refundCooldown(interaction);
+        if (price.reason.status === 404) return interaction.editReply(`**${item.name}** ยังไม่มีราคาในตลาดตอนนี้`);
+        console.error(`Could not load the price of ${item.name}:`, price.reason.message);
+        return interaction.editReply('ดึงราคาไม่สำเร็จ ลองใหม่อีกครั้งภายหลัง');
+      }
+      const message = await makePriceMessage(item, {
+        price: price.value, series: series.status === 'fulfilled' ? series.value : [], sellTaxPercent: config.sellTaxPercent,
+      });
+      return interaction.editReply(await attachThumbnails(message));
+    }
     if (interaction.commandName === 'player') {
       if (config.demoMode) return interaction.reply({ content: 'คำสั่งนี้ต้องใช้ข้อมูลจริงจาก API ตั้ง DEMO_MODE=false ก่อน', flags: MessageFlags.Ephemeral });
       const query = interaction.options.getString('name', true).trim();
@@ -325,10 +273,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.deferReply(redirect ? { flags: MessageFlags.Ephemeral } : {});
       try {
         const report = await fetchPlayerReport(config, query, { seasonId: seasonKey === 'current' ? undefined : seasonKey });
-        cacheReport(seasonKey, report);
-        // Every looked-up player is tracked automatically so the Recent matches tab fills up without /track add.
-        trackPlayer(config, interaction.guildId, report.player).catch((error) => console.warn(`Could not auto-track ${report.player.name}:`, error.message));
-        const message = { ...(await makePlayerMessage(report)), components: [playerButtons(report.player.id, seasonKey, 'overview')] };
+        const message = await makePlayerMessage(report);
         if (!redirect) return interaction.editReply(message);
         const channel = await client.channels.fetch(statsChannelId);
         if (!channel?.isTextBased()) throw new Error('Stats channel is unavailable.');
@@ -339,42 +284,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         console.error(error);
         if ([50001, 50013].includes(error.code)) return interaction.editReply(`บอตไม่มีสิทธิ์โพสต์ใน <#${statsChannelId}> ให้แอดมินเพิ่มสิทธิ์ให้ role ของบอตในห้องนั้น (ดูได้ที่ /botstatus)`);
         return interaction.editReply('ดึงข้อมูลผู้เล่นไม่สำเร็จ ลองใหม่อีกครั้งภายหลัง');
-      }
-    }
-    if (interaction.commandName === 'track') {
-      if (config.demoMode) return interaction.reply({ content: 'คำสั่งนี้ต้องใช้ข้อมูลจริงจาก API ตั้ง DEMO_MODE=false ก่อน', flags: MessageFlags.Ephemeral });
-      const sub = interaction.options.getSubcommand();
-      if (sub === 'list') {
-        const players = await listTracked(interaction.guildId);
-        const lines = players.map((player) => `${player.pinned ? '📌' : '🔄'} **${player.name}**  —  ${player.events.length} รายการ  •  ติดตามตั้งแต่ <t:${Math.floor(new Date(player.startedAt).getTime() / 1000)}:R>`);
-        return interaction.reply({
-          content: lines.length
-            ? `ผู้เล่นที่ติดตาม (${players.length}/${MAX_PLAYERS_PER_GUILD})  •  📌 ถาวร  🔄 อัตโนมัติจาก /player (หยุดเมื่อไม่มีใครดู 14 วัน)\n${lines.join('\n').slice(0, 1_800)}`
-            : 'ยังไม่ได้ติดตามใคร ค้นหาด้วย `/player` หรือ `/track add` เพื่อเริ่มติดตาม',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-      const name = interaction.options.getString('name', true).trim();
-      if (!(await canManageTracking(interaction))) {
-        return interaction.reply({ content: '/track add และ /track remove ใช้ได้เฉพาะแอดมิน หรือ role ที่แอดมินตั้งไว้ด้วย /trackrole', flags: MessageFlags.Ephemeral });
-      }
-      if (sub === 'remove') {
-        const removed = await untrackPlayer(interaction.guildId, name);
-        return interaction.reply({ content: removed ? `เลิกติดตาม **${removed}** แล้ว` : `ไม่ได้ติดตามผู้เล่นชื่อ **${name}** อยู่`, flags: MessageFlags.Ephemeral });
-      }
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-      try {
-        const player = await findPlayer(config, name);
-        const result = await trackPlayer(config, interaction.guildId, player, { pinned: true });
-        if (result.reason === 'full') return interaction.editReply(`ติดตามแบบถาวรได้สูงสุด ${MAX_PLAYERS_PER_GUILD} คนต่อเซิร์ฟเวอร์ ลบคนเก่าก่อนด้วย \`/track remove\``);
-        if (result.reason === 'already') {
-          return interaction.editReply(result.pinnedNow ? `ปักหมุด **${player.name}** แล้ว จะติดตามต่อไปแม้ไม่มีใครดูเกิน 14 วัน` : `ติดตาม **${player.name}** แบบถาวรอยู่แล้ว`);
-        }
-        return interaction.editReply(`เริ่มติดตาม **${player.name}** แบบถาวรแล้ว บอตจะเช็กทุก ${config.trackIntervalMinutes} นาที แมตช์ใหม่จะขึ้นในปุ่ม 📜 แมตช์ล่าสุด ของ \`/player\``);
-      } catch (error) {
-        if (error instanceof PlayerNotFoundError) return interaction.editReply(`ไม่พบผู้เล่นชื่อ **${name}** ลองเช็กตัวสะกด หรือใช้ Delta Force ID แทน`);
-        console.error(error);
-        return interaction.editReply('เริ่มติดตามไม่สำเร็จ ลองใหม่อีกครั้งภายหลัง');
       }
     }
   } catch (error) {
