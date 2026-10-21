@@ -19,20 +19,37 @@ export function formatCompact(value) {
   return String(Math.round(value));
 }
 
-const formatDate = (date) => date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', timeZone: 'Asia/Bangkok' });
+// "21 ต.ค." (or "21" with month: false) in the given time zone.
+export const formatDate = (date, timeZone = 'Asia/Bangkok', { month = true } = {}) => date.toLocaleDateString('th-TH', { day: 'numeric', ...(month && { month: 'short' }), timeZone });
+
+// The same arrows and signs wherever a change is shown: "▲ +5.0%", "▼ −23.3%", "± 0.0%".
+const arrow = (value) => (value > 0 ? '▲ +' : value < 0 ? '▼ −' : '± ');
+export const formatPercentChange = (ratio) => `${arrow(ratio)}${Math.abs(ratio * 100).toFixed(1)}%`;
+// "▲ +5.01M  (+3.0%)" against `base`; no change at all is just "± 0".
+export function formatAmountChange(change, base) {
+  if (!change) return '± 0';
+  const percent = base ? `  (${change > 0 ? '+' : '−'}${Math.abs((change / base) * 100).toFixed(1)}%)` : '';
+  return `${arrow(change)}${formatCompact(Math.abs(change))}${percent}`;
+}
 
 // Draws a line chart of { at: Date, value: number } points as a PNG. Returns null with fewer than 2 points.
 // Optional: `start`/`end` fix the time axis (otherwise it spans the points), `ticks` ([{ at, label }]) replace the
-// first/last date labels, `badge` ({ text, color }) is shown top right, and `step` holds each value until the next
-// point instead of drawing a slope (for values that change in jumps, like a stash).
-export async function makeLineChart(points, { title, start: rangeStart, end: rangeEnd, ticks, badge, step = false }) {
+// first/last date labels (shown in `timeZone`), `badge` ({ text, color }) is shown top right, and `step` holds each
+// value until the next point instead of drawing a slope (for values that change in jumps, like a stash).
+// `markers` ([{ at, value, label, color, below }]) rings chosen points and writes a short label above them (below
+// with `below`), and `labelExtremes` tags the highest and lowest gridlines.
+export async function makeLineChart(points, {
+  title, start: rangeStart, end: rangeEnd, ticks, badge, step = false, timeZone, markers = [], labelExtremes = false,
+}) {
   if (points.length < 2) return null;
   const sorted = [...points].sort((a, b) => a.at - b.at);
   const values = sorted.map((point) => point.value);
-  let min = Math.min(...values);
-  let max = Math.max(...values);
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  let min = low;
+  let max = high;
   if (min === max) { min -= 1; max += 1; }
-  // A little headroom so the line doesn't sit on the top or bottom edge.
+  // A little headroom so the line doesn't sit on the top or bottom edge; the axis labels stay at the real values.
   const headroom = (max - min) * 0.08;
   min -= headroom;
   max += headroom;
@@ -49,20 +66,40 @@ export async function makeLineChart(points, { title, start: rangeStart, end: ran
     return step ? `H${x(point).toFixed(1)} V${y(point.value).toFixed(1)}` : `L${x(point).toFixed(1)},${y(point.value).toFixed(1)}`;
   }).join(' ');
   const area = `${line} L${x(sorted.at(-1)).toFixed(1)},${PAD.top + plotHeight} L${x(sorted[0]).toFixed(1)},${PAD.top + plotHeight} Z`;
-  const gridLines = [0, 0.5, 1].map((t) => {
-    const value = min + (max - min) * (1 - t);
-    const gy = PAD.top + t * plotHeight;
+  const levels = low === high ? [low] : [high, (low + high) / 2, low];
+  const gridLines = levels.map((value) => {
+    const gy = y(value);
     return `<line x1="${PAD.left}" y1="${gy}" x2="${WIDTH - PAD.right}" y2="${gy}" stroke="#3f4147" stroke-width="1"/>`
       + `<text x="${PAD.left - 10}" y="${gy + 6}" text-anchor="end" font-family="${FONT}" font-size="17" fill="#b5bac1">${formatCompact(value)}</text>`;
   }).join('');
   const last = sorted.at(-1);
   const axisLabels = ticks
     ? ticks.map((tick) => `<text x="${xAt(tick.at).toFixed(1)}" y="${HEIGHT - 12}" text-anchor="middle" font-family="${FONT}" font-size="16" fill="#b5bac1">${escapeXml(tick.label)}</text>`).join('')
-    : `<text x="${PAD.left}" y="${HEIGHT - 12}" font-family="${FONT}" font-size="16" fill="#b5bac1">${escapeXml(formatDate(sorted[0].at))}</text>`
-      + `<text x="${WIDTH - PAD.right}" y="${HEIGHT - 12}" text-anchor="end" font-family="${FONT}" font-size="16" fill="#b5bac1">${escapeXml(formatDate(last.at))}</text>`;
+    : `<text x="${PAD.left}" y="${HEIGHT - 12}" font-family="${FONT}" font-size="16" fill="#b5bac1">${escapeXml(formatDate(sorted[0].at, timeZone))}</text>`
+      + `<text x="${WIDTH - PAD.right}" y="${HEIGHT - 12}" text-anchor="end" font-family="${FONT}" font-size="16" fill="#b5bac1">${escapeXml(formatDate(last.at, timeZone))}</text>`;
   const badgeText = badge
     ? `<text x="${WIDTH - PAD.right}" y="30" text-anchor="end" font-family="${FONT}" font-size="20" font-weight="bold" fill="${badge.color}">${escapeXml(badge.text)}</text>`
     : '';
+  const extremeTags = labelExtremes && low !== high
+    ? `<text x="${WIDTH - PAD.right - 4}" y="${(y(high) - 6).toFixed(1)}" text-anchor="end" font-family="${FONT}" font-size="13" fill="#80848e">สูงสุด</text>`
+      + `<text x="${WIDTH - PAD.right - 4}" y="${(y(low) + 16).toFixed(1)}" text-anchor="end" font-family="${FONT}" font-size="13" fill="#80848e">ต่ำสุด</text>`
+    : '';
+  // A label goes on its preferred side unless that side has no room or would crowd the previous label there. A label
+  // moved to the other side shifts right so it doesn't sit on the step's vertical line.
+  const lastLabelX = { above: -Infinity, below: -Infinity };
+  const other = (side) => (side === 'above' ? 'below' : 'above');
+  const markerShapes = [...markers].sort((a, b) => a.at - b.at).map((marker) => {
+    const mx = xAt(marker.at);
+    const my = y(marker.value);
+    const fits = (side) => (side === 'above' ? my - 10 >= PAD.top + 14 : my + 20 <= PAD.top + plotHeight - 2);
+    const preferred = marker.below ? 'below' : 'above';
+    const side = fits(preferred) && mx - lastLabelX[preferred] >= 56 ? preferred : other(preferred);
+    lastLabelX[side] = mx;
+    const labelX = Math.min(Math.max(mx + (side === preferred ? 0 : 34), PAD.left + 28), WIDTH - PAD.right - 28);
+    const labelY = Math.min(Math.max(side === 'above' ? my - 10 : my + 20, PAD.top + 12), PAD.top + plotHeight - 4);
+    return `<circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="4" fill="#2b2d31" stroke="#f1c40f" stroke-width="2.5"/>`
+      + (marker.label ? `<text x="${labelX.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="middle" font-family="${FONT}" font-size="14" font-weight="bold" fill="${marker.color ?? '#f2f3f5'}">${escapeXml(marker.label)}</text>` : '');
+  }).join('');
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}">
     <defs><linearGradient id="fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f1c40f" stop-opacity="0.35"/><stop offset="1" stop-color="#f1c40f" stop-opacity="0"/></linearGradient></defs>
@@ -72,6 +109,8 @@ export async function makeLineChart(points, { title, start: rangeStart, end: ran
     ${gridLines}
     <path d="${area}" fill="url(#fill)"/>
     <path d="${line}" fill="none" stroke="#f1c40f" stroke-width="3" stroke-linejoin="round"/>
+    ${extremeTags}
+    ${markerShapes}
     <circle cx="${x(last).toFixed(1)}" cy="${y(last.value).toFixed(1)}" r="5" fill="#f1c40f"/>
     ${axisLabels}
   </svg>`;

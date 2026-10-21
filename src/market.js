@@ -1,5 +1,5 @@
 import { EmbedBuilder } from 'discord.js';
-import { formatCompact, formatNumber, makeLineChart } from './charts.js';
+import { formatCompact, formatNumber, formatPercentChange, makeLineChart } from './charts.js';
 import { mapLimit } from './crafting.js';
 import { callApi, catalogSnapshot, fetchMarketPrice, getCatalog, normalizeName } from './deltaforce.js';
 
@@ -11,7 +11,6 @@ const HOUR_MS = 60 * 60 * 1000;
 // Shown while the item list is still loading. Its value normalizes to nothing, so picking it matches no item.
 const LOADING_CHOICE = { name: 'กำลังโหลดรายชื่อไอเทม ลองพิมพ์ใหม่ในอีกสักครู่', value: '-' };
 
-const formatChange = (ratio) => `${ratio >= 0 ? '▲' : '▼'} ${Math.abs(ratio * 100).toFixed(1)}%`;
 const isMarketItem = (item) => item.name && item.auctionable !== false;
 const label = (item) => `${item.name}${item.quality ? ` · T${item.quality}` : ''}`;
 
@@ -68,7 +67,7 @@ export async function fetchPriceSeries(config, itemId) {
   })];
 }
 
-export async function makePriceMessage(item, { price, series, sellTaxPercent }) {
+export async function makePriceMessage(item, { price, series, sellTaxPercent, timeZone }) {
   const lines = [
     `💰 ราคาตอนนี้ **${formatNumber(price.price)}**`,
     `ขายได้จริงหลังหักภาษี ${sellTaxPercent}% ≈ **${formatNumber(price.price * (1 - sellTaxPercent / 100))}**`,
@@ -96,7 +95,7 @@ export async function makePriceMessage(item, { price, series, sellTaxPercent }) 
   if (item.iconUrl) embed.setThumbnail(item.iconUrl);
 
   const points = series.map((point) => ({ at: new Date(point.createdAt), value: point.priceAvg }));
-  const chart = await makeLineChart(points, { title: `ราคาเฉลี่ยรายชั่วโมง ${HISTORY_DAYS} วันล่าสุด` }).catch(() => null);
+  const chart = await makeLineChart(points, { title: `ราคาเฉลี่ยรายชั่วโมง ${HISTORY_DAYS} วันล่าสุด`, timeZone }).catch(() => null);
   if (!chart) return { embeds: [embed] };
   embed.setImage('attachment://price-history.png');
   return { embeds: [embed], files: [{ attachment: chart, name: 'price-history.png' }] };
@@ -128,7 +127,7 @@ export function makeRedBoardMessage(entries) {
   const top = [...entries].sort((a, b) => b.price - a.price).slice(0, BOARD_SIZE);
   const risers = entries.filter((entry) => entry.change > 0).sort((a, b) => b.change - a.change).slice(0, MOVERS);
   const fallers = entries.filter((entry) => entry.change < 0).sort((a, b) => a.change - b.change).slice(0, MOVERS);
-  const line = ({ item, price, change }) => `**${item.name}** ${formatCompact(price)}${change == null ? '' : `  ${formatChange(change)}`}`;
+  const line = ({ item, price, change }) => `**${item.name}** ${formatCompact(price)}${change == null ? '' : `  ${formatPercentChange(change)}`}`;
   const embed = new EmbedBuilder()
     .setColor(0xe74c3c)
     .setTitle(`💎 ของแดงราคาสูงสุด — Top ${top.length}`)

@@ -1,6 +1,7 @@
 import { EmbedBuilder } from 'discord.js';
-import { formatCompact, makeLineChart } from './charts.js';
+import { formatAmountChange, formatCompact, formatDate, makeLineChart } from './charts.js';
 import { callApi } from './deltaforce.js';
+import { currentWeek, zonedParts } from './time.js';
 
 // The stash chart covers the current week; history from this many days before Monday supplies the value
 // carried into the week (the API records a stash only about twice a day).
@@ -59,31 +60,17 @@ export async function findPlayer(config, query) {
   }
 }
 
-// Monday 00:00 up to the next Monday 00:00 of the current week, in `timeZone`.
-export function currentWeek(timeZone, now = new Date()) {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
-    timeZone, year: 'numeric', month: 'numeric', day: 'numeric', weekday: 'short', hour: 'numeric', minute: 'numeric', second: 'numeric', hourCycle: 'h23',
-  }).formatToParts(now).map(({ type, value }) => [type, value]));
-  const wallClock = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
-  const offset = wallClock - Math.floor(now.getTime() / 1000) * 1000;
-  const weekday = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(parts.weekday);
-  const start = new Date(Date.UTC(+parts.year, +parts.month - 1, +parts.day - weekday) - offset);
-  return { start, end: new Date(start.getTime() + 7 * DAY_MS), timeZone };
-}
-
-async function fetchStashHistory(config, playerId, since) {
-  const stashes = [];
+// Every page (up to MAX_HISTORY_PAGES of 100 records) of one of the API's history calls.
+async function fetchHistory(config, method, listKey, body) {
+  const records = [];
   let pageToken;
-  const startTime = since.toISOString();
   for (let page = 0; page < MAX_HISTORY_PAGES; page++) {
-    const result = await callApi(config, 'GetPlayerOperationHistoricalStashValue', {
-      playerId, startTime, pageSize: 100, ...(pageToken && { pageToken }),
-    });
-    stashes.push(...(result.stashes ?? []));
+    const result = await callApi(config, method, { ...body, pageSize: 100, ...(pageToken && { pageToken }) });
+    records.push(...(result[listKey] ?? []));
     pageToken = result.nextPageToken;
     if (!pageToken) break;
   }
-  return stashes;
+  return records;
 }
 
 // Missing stats or stash data (e.g. a player who never played Operations) come back as null instead of failing.
@@ -108,14 +95,19 @@ export async function fetchPlayerReport(config, query, { seasonId } = {}) {
   const bothFor = (seasonOfStats) => Promise.all([statsFor(false, seasonOfStats), statsFor(true, seasonOfStats)]);
 
   const week = currentWeek(config.timeZone);
-  const [[first, firstRanked], stash, history] = await Promise.all([
+  const startTime = new Date(week.start.getTime() - BASELINE_LOOKBACK_DAYS * DAY_MS).toISOString();
+  // The weekly chart and activity are extras: if their history can't be loaded, show the card without them.
+  const extra = (promise, what) => promise.catch((error) => {
+    if (error.status !== 404) console.warn(`Could not load the ${what} of ${player.name}:`, error.message);
+    return [];
+  });
+  const [[first, firstRanked], stash, history, statsHistory] = await Promise.all([
     bothFor(season),
     optional(callApi(config, 'GetPlayerOperationStashValue', { playerId: player.id })).then((r) => r?.stash ?? null),
-    // The chart is extra: if its history can't be loaded, show the card without it.
-    fetchStashHistory(config, player.id, new Date(week.start.getTime() - BASELINE_LOOKBACK_DAYS * DAY_MS)).catch((error) => {
-      if (error.status !== 404) console.warn(`Could not load the stash history of ${player.name}:`, error.message);
-      return [];
-    }),
+    extra(fetchHistory(config, 'GetPlayerOperationHistoricalStashValue', 'stashes', { playerId: player.id, startTime }), 'stash history'),
+    // Lifetime stats, so a new season starting mid-week doesn't reset the counts. The API returns nothing unless
+    // `ranked: false` is sent explicitly (false means all matches, not only unranked ones).
+    extra(fetchHistory(config, 'GetPlayerOperationHistoricalStats', 'stats', { playerId: player.id, ranked: false, startTime }), 'stats history'),
   ]);
   let [unranked, ranked] = [first, firstRanked];
 
@@ -144,6 +136,7 @@ export async function fetchPlayerReport(config, query, { seasonId } = {}) {
     rankedOnly: !unranked && Boolean(ranked),
     stash,
     history,
+    statsHistory,
     week,
   };
 }
@@ -154,11 +147,12 @@ const stat = (label, value) => `${label}\n**${value}**`;
 // this week when the player has none earlier), its latest value, and the points to chart. A stash only changes
 // when the API records it, so the chart holds each value until the next record and up to now.
 function stashWeek(history, stash, { start, end }) {
-  const seen = new Set();
-  const points = [...history, ...(stash ? [stash] : [])]
+  // The current stash is usually also the newest history record; keep one point per timestamp.
+  const byTime = new Map([...history, ...(stash ? [stash] : [])]
     .map((entry) => ({ at: new Date(entry.createdAt), value: Number(entry.assetsNet ?? 0) }))
-    .filter((point) => !Number.isNaN(point.at.getTime()) && !seen.has(point.at.getTime()) && seen.add(point.at.getTime()))
-    .sort((a, b) => a.at - b.at);
+    .filter((point) => !Number.isNaN(point.at.getTime()))
+    .map((point) => [point.at.getTime(), point]));
+  const points = [...byTime.values()].sort((a, b) => a.at - b.at);
   const before = points.filter((point) => point.at < start);
   const during = points.filter((point) => point.at >= start && point.at < end);
   const baseline = before.at(-1) ?? during[0];
@@ -167,16 +161,42 @@ function stashWeek(history, stash, { start, end }) {
   const now = new Date(Math.min(Date.now(), end.getTime()));
   const chart = [...(before.length ? [{ at: start, value: baseline.value }] : []), ...during];
   if (chart.at(-1).at < now) chart.push({ at: now, value: latest.value });
-  return { baseline, latest, fromMonday: before.length > 0, change: latest.value - baseline.value, chart };
+  // Each record this week and how much it moved the stash (none for the first record when there is no earlier one).
+  const records = during.map((point, index) => {
+    const previous = index ? during[index - 1] : before.at(-1);
+    return { ...point, change: previous ? point.value - previous.value : null };
+  });
+  return { baseline, latest, fromMonday: before.length > 0, change: latest.value - baseline.value, chart, records };
 }
 
-function formatStashChange({ change, baseline }) {
-  const sign = change > 0 ? '▲ +' : change < 0 ? '▼ −' : '± ';
-  const percent = baseline.value ? `  (${change >= 0 ? '+' : '−'}${Math.abs((change / baseline.value) * 100).toFixed(1)}%)` : '';
-  return `${sign}${formatCompact(Math.abs(change))}${percent}`;
+// What the player did this week, from the lifetime stats the API records at each refresh: the newest record minus
+// the last one before Monday (or the first one this week when there is none earlier).
+function activityWeek(statsHistory, { start, end }) {
+  const records = statsHistory
+    .map((entry) => ({ entry, at: new Date(entry.createdAt) }))
+    .filter(({ at }) => !Number.isNaN(at.getTime()))
+    .sort((a, b) => a.at - b.at);
+  const before = records.filter(({ at }) => at < start);
+  const during = records.filter(({ at }) => at >= start && at < end);
+  const baseline = before.at(-1) ?? during[0];
+  if (!baseline) return null;
+  const latest = during.at(-1) ?? baseline;
+  const gain = (key) => Math.max(0, Number(latest.entry[key] ?? 0) - Number(baseline.entry[key] ?? 0));
+  return {
+    fromMonday: before.length > 0,
+    since: baseline.at,
+    matches: gain('matchesPlayed'),
+    extracted: gain('matchesExtracted'),
+    kills: gain('totalKills'),
+    extractedAssets: gain('extractedAssets'),
+  };
 }
 
-export async function makePlayerMessage({ player, season, requestedSeason, seasonFallback, fresh, stats, rankedOnly, stash, history, week }) {
+const formatSigned = (change) => `${change > 0 ? '+' : '−'}${formatCompact(Math.abs(change))}`;
+
+export async function makePlayerMessage({
+  player, season, requestedSeason, seasonFallback, fresh, stats, rankedOnly, stash, history, statsHistory = [], week,
+}) {
   const period = `${season ? (season.number ? seasonLabel(season) : 'ซีซันที่เลือก') : 'ตลอดกาล'}${rankedOnly ? '  •  Ranked' : ''}`;
   const embed = new EmbedBuilder()
     .setColor(0x3498db)
@@ -234,15 +254,34 @@ export async function makePlayerMessage({ player, season, requestedSeason, seaso
   embed.setDescription(header.join('\n'));
 
   const weekly = week ? stashWeek(history, stash, week) : null;
-  const dayMonth = (date) => date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', timeZone: week?.timeZone });
-  if (stash) {
-    const lines = [
-      `**${formatNumber(stash.assetsNet)}**  (เงินสด ${formatCompact(Number(stash.assetsLiquid ?? 0))} + อุปกรณ์ ${formatCompact(Number(stash.assetsFixed ?? 0))})`,
-      `ของสะสม ${formatCompact(Number(stash.assetsCollection ?? 0))} (แยกต่างหาก)`,
-    ];
-    if (weekly) lines.push(`สัปดาห์นี้ **${formatStashChange(weekly)}**${weekly.fromMonday ? '' : `  (นับตั้งแต่ ${dayMonth(weekly.baseline.at)})`}`);
+  const weeklyChange = weekly && formatAmountChange(weekly.change, weekly.baseline.value);
+  if (stash || weekly) {
     // assetsNet is cash + equipment; the collection value is reported separately and not part of it.
+    const lines = stash
+      ? [
+          `**${formatNumber(stash.assetsNet)}**  (เงินสด ${formatCompact(Number(stash.assetsLiquid ?? 0))} + อุปกรณ์ ${formatCompact(Number(stash.assetsFixed ?? 0))})`,
+          `ของสะสม ${formatCompact(Number(stash.assetsCollection ?? 0))} (แยกต่างหาก)`,
+        ]
+      : [`**${formatNumber(weekly.latest.value)}**`];
+    if (weekly) lines.push(`สัปดาห์นี้ **${weeklyChange}**${weekly.fromMonday ? '' : `  (นับตั้งแต่ ${formatDate(weekly.baseline.at, week.timeZone)})`}`);
+    // The API records a stash only every ~15 hours, so say how old these numbers are.
+    const recordedAt = stash?.createdAt ? new Date(stash.createdAt) : weekly.latest.at;
+    if (!Number.isNaN(recordedAt.getTime())) lines.push(`ข้อมูลคลังอัปเดตล่าสุด <t:${Math.floor(recordedAt.getTime() / 1000)}:R>`);
     embed.addFields({ name: '🏦 มูลค่าคลัง', value: lines.join('\n') });
+  }
+
+  const activity = week ? activityWeek(statsHistory, week) : null;
+  if (activity) {
+    const since = activity.fromMonday ? '' : `  (นับตั้งแต่ ${formatDate(activity.since, week.timeZone)})`;
+    const summary = activity.matches
+      ? [
+          `${formatNumber(activity.matches)} แมตช์`,
+          `ถอนตัว ${formatNumber(activity.extracted)} (${Math.round((activity.extracted / activity.matches) * 100)}%)`,
+          `ฆ่า ${formatNumber(activity.kills)}`,
+          `ขนออก ${formatCompact(activity.extractedAssets)}`,
+        ].join('  •  ')
+      : 'ยังไม่มีแมตช์ที่ API บันทึกในสัปดาห์นี้';
+    embed.addFields({ name: '🎮 กิจกรรมสัปดาห์นี้', value: `${summary}${since}` });
   }
 
   const pastNames = (player.nameHistory ?? []).map((entry) => entry.name).filter((name) => name && name !== player.name);
@@ -251,20 +290,30 @@ export async function makePlayerMessage({ player, season, requestedSeason, seaso
 
   let chart = null;
   if (weekly) {
-    const day = (date) => date.toLocaleDateString('th-TH', { day: 'numeric', timeZone: week.timeZone });
-    const sunday = new Date(week.start.getTime() + 6.5 * DAY_MS);
-    const sameMonth = dayMonth(week.start).split(' ')[1] === dayMonth(sunday).split(' ')[1];
-    const range = `${sameMonth ? day(week.start) : dayMonth(week.start)}–${dayMonth(sunday)}`;
+    const { timeZone, days } = week;
+    const sunday = days[6];
+    const sameMonth = zonedParts(timeZone, week.start).month === zonedParts(timeZone, sunday).month;
+    const range = `${formatDate(week.start, timeZone, { month: !sameMonth })}–${formatDate(sunday, timeZone)}`;
     chart = await makeLineChart(weekly.chart, {
       title: `มูลค่าคลัง สัปดาห์นี้ (${range})`,
       start: week.start,
       end: week.end,
-      ticks: WEEKDAYS.map((name, index) => {
-        const noon = new Date(week.start.getTime() + (index + 0.5) * DAY_MS);
-        return { at: noon, label: `${name} ${day(noon)}` };
+      // Each day's label sits in the middle of that day.
+      ticks: days.map((dayStart, index) => {
+        const dayEnd = days[index + 1] ?? week.end;
+        return { at: new Date((dayStart.getTime() + dayEnd.getTime()) / 2), label: `${WEEKDAYS[index]} ${formatDate(dayStart, timeZone, { month: false })}` };
       }),
-      badge: { text: formatStashChange(weekly), color: weekly.change > 0 ? '#57f287' : weekly.change < 0 ? '#ed4245' : '#b5bac1' },
+      badge: { text: weeklyChange, color: weekly.change > 0 ? '#57f287' : weekly.change < 0 ? '#ed4245' : '#b5bac1' },
       step: true,
+      // A ring at every record the API made this week, labelled with how much it moved the stash.
+      markers: weekly.records.map(({ at, value, change }) => ({
+        at,
+        value,
+        label: change ? formatSigned(change) : '',
+        color: change > 0 ? '#57f287' : '#ed4245',
+        below: change < 0,
+      })),
+      labelExtremes: true,
     }).catch(() => null);
   }
   if (!chart) return { embeds: [embed] };
