@@ -298,10 +298,15 @@ export async function makePlayerMessage({
       title: `มูลค่าคลัง สัปดาห์นี้ (${range})`,
       start: week.start,
       end: week.end,
-      // Each day's label sits in the middle of that day.
-      ticks: days.map((dayStart, index) => {
+      days: days.map((dayStart, index) => {
         const dayEnd = days[index + 1] ?? week.end;
-        return { at: new Date((dayStart.getTime() + dayEnd.getTime()) / 2), label: `${WEEKDAYS[index]} ${formatDate(dayStart, timeZone, { month: false })}` };
+        const now = Date.now();
+        return {
+          start: dayStart,
+          end: dayEnd,
+          label: `${WEEKDAYS[index]} ${formatDate(dayStart, timeZone, { month: false })}`,
+          today: dayStart.getTime() <= now && now < dayEnd.getTime(),
+        };
       }),
       badge: { text: weeklyChange, color: weekly.change > 0 ? '#57f287' : weekly.change < 0 ? '#ed4245' : '#b5bac1' },
       step: true,
