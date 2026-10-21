@@ -22,22 +22,33 @@ export function formatCompact(value) {
 const formatDate = (date) => date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', timeZone: 'Asia/Bangkok' });
 
 // Draws a line chart of { at: Date, value: number } points as a PNG. Returns null with fewer than 2 points.
-export async function makeLineChart(points, { title }) {
+// Optional: `start`/`end` fix the time axis (otherwise it spans the points), `ticks` ([{ at, label }]) replace the
+// first/last date labels, `badge` ({ text, color }) is shown top right, and `step` holds each value until the next
+// point instead of drawing a slope (for values that change in jumps, like a stash).
+export async function makeLineChart(points, { title, start: rangeStart, end: rangeEnd, ticks, badge, step = false }) {
   if (points.length < 2) return null;
   const sorted = [...points].sort((a, b) => a.at - b.at);
   const values = sorted.map((point) => point.value);
   let min = Math.min(...values);
   let max = Math.max(...values);
   if (min === max) { min -= 1; max += 1; }
-  const start = sorted[0].at.getTime();
-  const span = Math.max(sorted.at(-1).at.getTime() - start, 1);
+  // A little headroom so the line doesn't sit on the top or bottom edge.
+  const headroom = (max - min) * 0.08;
+  min -= headroom;
+  max += headroom;
+  const start = (rangeStart ?? sorted[0].at).getTime();
+  const span = Math.max((rangeEnd ?? sorted.at(-1).at).getTime() - start, 1);
   const plotWidth = WIDTH - PAD.left - PAD.right;
   const plotHeight = HEIGHT - PAD.top - PAD.bottom;
-  const x = (point) => PAD.left + ((point.at.getTime() - start) / span) * plotWidth;
+  const xAt = (date) => PAD.left + ((date.getTime() - start) / span) * plotWidth;
+  const x = (point) => xAt(point.at);
   const y = (value) => PAD.top + (1 - (value - min) / (max - min)) * plotHeight;
 
-  const line = sorted.map((point, i) => `${i ? 'L' : 'M'}${x(point).toFixed(1)},${y(point.value).toFixed(1)}`).join(' ');
-  const area = `${line} L${x(sorted.at(-1)).toFixed(1)},${PAD.top + plotHeight} L${PAD.left},${PAD.top + plotHeight} Z`;
+  const line = sorted.map((point, i) => {
+    if (!i) return `M${x(point).toFixed(1)},${y(point.value).toFixed(1)}`;
+    return step ? `H${x(point).toFixed(1)} V${y(point.value).toFixed(1)}` : `L${x(point).toFixed(1)},${y(point.value).toFixed(1)}`;
+  }).join(' ');
+  const area = `${line} L${x(sorted.at(-1)).toFixed(1)},${PAD.top + plotHeight} L${x(sorted[0]).toFixed(1)},${PAD.top + plotHeight} Z`;
   const gridLines = [0, 0.5, 1].map((t) => {
     const value = min + (max - min) * (1 - t);
     const gy = PAD.top + t * plotHeight;
@@ -45,17 +56,24 @@ export async function makeLineChart(points, { title }) {
       + `<text x="${PAD.left - 10}" y="${gy + 6}" text-anchor="end" font-family="${FONT}" font-size="17" fill="#b5bac1">${formatCompact(value)}</text>`;
   }).join('');
   const last = sorted.at(-1);
+  const axisLabels = ticks
+    ? ticks.map((tick) => `<text x="${xAt(tick.at).toFixed(1)}" y="${HEIGHT - 12}" text-anchor="middle" font-family="${FONT}" font-size="16" fill="#b5bac1">${escapeXml(tick.label)}</text>`).join('')
+    : `<text x="${PAD.left}" y="${HEIGHT - 12}" font-family="${FONT}" font-size="16" fill="#b5bac1">${escapeXml(formatDate(sorted[0].at))}</text>`
+      + `<text x="${WIDTH - PAD.right}" y="${HEIGHT - 12}" text-anchor="end" font-family="${FONT}" font-size="16" fill="#b5bac1">${escapeXml(formatDate(last.at))}</text>`;
+  const badgeText = badge
+    ? `<text x="${WIDTH - PAD.right}" y="30" text-anchor="end" font-family="${FONT}" font-size="20" font-weight="bold" fill="${badge.color}">${escapeXml(badge.text)}</text>`
+    : '';
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}">
     <defs><linearGradient id="fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f1c40f" stop-opacity="0.35"/><stop offset="1" stop-color="#f1c40f" stop-opacity="0"/></linearGradient></defs>
     <rect width="${WIDTH}" height="${HEIGHT}" rx="12" fill="#2b2d31"/>
     <text x="${PAD.left}" y="30" font-family="${FONT}" font-size="20" fill="#f2f3f5">${escapeXml(title)}</text>
+    ${badgeText}
     ${gridLines}
     <path d="${area}" fill="url(#fill)"/>
     <path d="${line}" fill="none" stroke="#f1c40f" stroke-width="3" stroke-linejoin="round"/>
     <circle cx="${x(last).toFixed(1)}" cy="${y(last.value).toFixed(1)}" r="5" fill="#f1c40f"/>
-    <text x="${PAD.left}" y="${HEIGHT - 12}" font-family="${FONT}" font-size="16" fill="#b5bac1">${escapeXml(formatDate(sorted[0].at))}</text>
-    <text x="${WIDTH - PAD.right}" y="${HEIGHT - 12}" text-anchor="end" font-family="${FONT}" font-size="16" fill="#b5bac1">${escapeXml(formatDate(last.at))}</text>
+    ${axisLabels}
   </svg>`;
   return sharp(Buffer.from(svg)).png().toBuffer();
 }
