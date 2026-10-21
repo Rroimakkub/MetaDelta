@@ -12,6 +12,7 @@ import { fetchPlayerReport, LIFETIME, listSeasons, makePlayerMessage, PlayerNotF
 import { cooldownLeft, cooldownReply, refundCooldown } from './permissions.js';
 import { makeMaterialsImage } from './recipe-card.js';
 import { getAllChannels, getChannel, setChannel } from './store.js';
+import { zonedParts } from './time.js';
 
 const config = getConfig();
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
@@ -82,14 +83,10 @@ async function postToAllConfiguredChannels() {
 let lastPostedOn = null;
 
 async function checkSchedule() {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: config.timeZone,
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).formatToParts();
-  const value = (type) => parts.find((part) => part.type === type)?.value;
-  const date = `${value('year')}-${value('month')}-${value('day')}`;
-  const time = `${value('hour')}:${value('minute')}`;
+  const now = zonedParts(config.timeZone);
+  const pad = (number) => String(number).padStart(2, '0');
+  const date = `${now.year}-${pad(now.month)}-${pad(now.day)}`;
+  const time = `${pad(now.hour)}:${pad(now.minute)}`;
   if (time === config.postTime && lastPostedOn !== date) {
     lastPostedOn = date;
     await postToAllConfiguredChannels();
@@ -257,7 +254,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.editReply('ดึงราคาไม่สำเร็จ ลองใหม่อีกครั้งภายหลัง');
       }
       const message = await makePriceMessage(item, {
-        price: price.value, series: series.status === 'fulfilled' ? series.value : [], sellTaxPercent: config.sellTaxPercent,
+        price: price.value, series: series.status === 'fulfilled' ? series.value : [], sellTaxPercent: config.sellTaxPercent, timeZone: config.timeZone,
       });
       return interaction.editReply(await attachThumbnails(message));
     }

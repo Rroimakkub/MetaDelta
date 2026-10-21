@@ -22,6 +22,13 @@ export function getConfig() {
     throw new Error(`Missing configuration: ${missing.join(', ')}. Copy .env.example to .env first.`);
   }
 
+  const timeZone = process.env.TIME_ZONE ?? 'Asia/Bangkok';
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone });
+  } catch {
+    throw new Error('TIME_ZONE must be an IANA time zone name, for example Asia/Bangkok.');
+  }
+
   const postTime = process.env.POST_TIME ?? '09:00';
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(postTime)) {
     throw new Error('POST_TIME must use HH:MM format, for example 09:00.');
@@ -56,7 +63,7 @@ export function getConfig() {
           { id: 'demo-vest', name: 'Elite Vest' },
         ]
       : parseMarketItems(process.env.MARKET_ITEMS ?? ''),
-    timeZone: process.env.TIME_ZONE ?? 'Asia/Bangkok',
+    timeZone,
     postTime,
     sellTaxPercent,
     topPerWorkshop,
