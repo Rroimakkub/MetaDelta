@@ -33,13 +33,14 @@ export function formatAmountChange(change, base) {
 }
 
 // Draws a line chart of { at: Date, value: number } points as a PNG. Returns null with fewer than 2 points.
-// Optional: `start`/`end` fix the time axis (otherwise it spans the points), `ticks` ([{ at, label }]) replace the
-// first/last date labels (shown in `timeZone`), `badge` ({ text, color }) is shown top right, and `step` holds each
-// value until the next point instead of drawing a slope (for values that change in jumps, like a stash).
-// `markers` ([{ at, value, label, color, below }]) rings chosen points and writes a short label above them (below
-// with `below`), and `labelExtremes` tags the highest and lowest gridlines.
+// Optional: `start`/`end` fix the time axis (otherwise it spans the points), `badge` ({ text, color }) is shown top
+// right, and `step` holds each value until the next point instead of drawing a slope (for values that change in
+// jumps, like a stash). `days` ([{ start, end, label, today }]) splits the axis into days: alternate days are shaded,
+// a dashed line marks each midnight, each label sits under its own day and today stands out; without it the first
+// and last dates are labelled (in `timeZone`). `markers` ([{ at, value, label, color, below }]) rings chosen points
+// and writes a short label above them (below with `below`), and `labelExtremes` tags the highest and lowest gridlines.
 export async function makeLineChart(points, {
-  title, start: rangeStart, end: rangeEnd, ticks, badge, step = false, timeZone, markers = [], labelExtremes = false,
+  title, start: rangeStart, end: rangeEnd, days, badge, step = false, timeZone, markers = [], labelExtremes = false,
 }) {
   if (points.length < 2) return null;
   const sorted = [...points].sort((a, b) => a.at - b.at);
@@ -73,8 +74,19 @@ export async function makeLineChart(points, {
       + `<text x="${PAD.left - 10}" y="${gy + 6}" text-anchor="end" font-family="${FONT}" font-size="17" fill="#b5bac1">${formatCompact(value)}</text>`;
   }).join('');
   const last = sorted.at(-1);
-  const axisLabels = ticks
-    ? ticks.map((tick) => `<text x="${xAt(tick.at).toFixed(1)}" y="${HEIGHT - 12}" text-anchor="middle" font-family="${FONT}" font-size="16" fill="#b5bac1">${escapeXml(tick.label)}</text>`).join('')
+  const dayBands = (days ?? []).map((day, index) => {
+    const x1 = xAt(day.start);
+    const width = xAt(day.end) - x1;
+    const shade = day.today ? 'fill="#f1c40f" fill-opacity="0.08"' : index % 2 ? 'fill="#ffffff" fill-opacity="0.035"' : '';
+    return (shade ? `<rect x="${x1.toFixed(1)}" y="${PAD.top - 8}" width="${width.toFixed(1)}" height="${HEIGHT - PAD.top + 4}" ${shade}/>` : '')
+      + (index ? `<line x1="${x1.toFixed(1)}" y1="${PAD.top - 8}" x2="${x1.toFixed(1)}" y2="${PAD.top + plotHeight}" stroke="#4e5058" stroke-width="1" stroke-dasharray="4 4"/>` : '');
+  }).join('');
+  const axisLabels = days
+    ? days.map((day) => {
+      const center = (xAt(day.start) + xAt(day.end)) / 2;
+      const style = day.today ? 'font-weight="bold" fill="#f2f3f5"' : 'fill="#b5bac1"';
+      return `<text x="${center.toFixed(1)}" y="${HEIGHT - 12}" text-anchor="middle" font-family="${FONT}" font-size="16" ${style}>${escapeXml(day.label)}</text>`;
+    }).join('')
     : `<text x="${PAD.left}" y="${HEIGHT - 12}" font-family="${FONT}" font-size="16" fill="#b5bac1">${escapeXml(formatDate(sorted[0].at, timeZone))}</text>`
       + `<text x="${WIDTH - PAD.right}" y="${HEIGHT - 12}" text-anchor="end" font-family="${FONT}" font-size="16" fill="#b5bac1">${escapeXml(formatDate(last.at, timeZone))}</text>`;
   const badgeText = badge
@@ -104,6 +116,7 @@ export async function makeLineChart(points, {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}">
     <defs><linearGradient id="fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f1c40f" stop-opacity="0.35"/><stop offset="1" stop-color="#f1c40f" stop-opacity="0"/></linearGradient></defs>
     <rect width="${WIDTH}" height="${HEIGHT}" rx="12" fill="#2b2d31"/>
+    ${dayBands}
     <text x="${PAD.left}" y="30" font-family="${FONT}" font-size="20" fill="#f2f3f5">${escapeXml(title)}</text>
     ${badgeText}
     ${gridLines}
